@@ -145,3 +145,22 @@ FORMAT REQUIRED:
 ```
 
 This format ensures that the AI host never gives generic "IA assistant" replies, but instead acts like a professional interviewer actively analyzing the guest's insights using retrieved RAG facts!
+
+---
+
+## 🤝 For Collaborators
+
+If you want to contribute to this project or run the code on your own machine without setting up the heavy Python backend, you can connect your local frontend directly to the hosted Render backend!
+
+1. **Fork and Clone** this repository.
+2. **Rename `.env.example` to `.env`** and add your own Groq API key.
+3. **Point to the Hosted Backend**: Inside your new `.env` file, add the following line with the live Render URL:
+   ```env
+   VITE_BACKEND_URL=https://your-joy-backend.onrender.com
+   ```
+4. **Run the UI**: 
+   ```bash
+   npm install
+   npm run dev
+   ```
+Now, any code changes you make to the React UI on your local machine will automatically communicate with the live Render AI backend over the internet!
