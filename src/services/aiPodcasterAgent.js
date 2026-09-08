@@ -279,7 +279,8 @@ Generate an engaging opening podcast intro that welcomes all guests and asks you
   }
 
   async _callGroqAPI(messages) {
-    const res = await fetch("http://localhost:8000/api/proxy-chat", {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+    const res = await fetch(`${backendUrl}/api/proxy-chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: this.groqApiKey, model: "openai/gpt-oss-120b", messages, temperature: 0.75, max_tokens: 800 })
