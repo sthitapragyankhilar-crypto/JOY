@@ -6,43 +6,14 @@
 export class AudioEngine {
   constructor(deepgramApiKey = '') {
     this.deepgramApiKey = deepgramApiKey;
-    this.synthesis = window.speechSynthesis;
     this.audioContext = null;
     this.analyser = null;
     this.mediaStream = null;
     this.isListening = false;
     this.isSpeaking = false;
-    this.voices = [];
-    this.selectedVoice = null;
     this.socket = null;
     this.mediaRecorder = null;
-
-    this._initSpeechSynthesis();
-  }
-
-  // Native SpeechRecognition is removed in favor of Deepgram
-
-  _initSpeechSynthesis() {
-    if (!this.synthesis) return;
-
-    const loadVoices = () => {
-      this.voices = this.synthesis.getVoices();
-      // Prefer feminine english voices for JOY
-      this.selectedVoice = this.voices.find(v =>
-        v.lang.startsWith("en") &&
-        (v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Zira") ||
-         v.name.includes("Female") || v.name.includes("Ava") || v.name.includes("Allison") ||
-         v.name.includes("Fiona") || v.name.includes("Victoria") || v.name.includes("Tessa"))
-      ) || this.voices.find(v =>
-        v.lang.startsWith("en") &&
-        (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Enhanced"))
-      ) || this.voices.find(v => v.lang.startsWith("en")) || this.voices[0];
-    };
-
-    loadVoices();
-    if (this.synthesis.onvoiceschanged !== undefined) {
-      this.synthesis.onvoiceschanged = loadVoices;
-    }
+    this.ttsSource = null;
   }
 
   /**
@@ -146,21 +117,18 @@ export class AudioEngine {
   }
 
   /**
-   * Speaks podcast response out loud with persona-aware voice settings.
+   * Speaks podcast response out loud using Deepgram Aura TTS.
    *
    * @param {string} text - Text to speak
    * @param {object} options - { pitch, rate, onStart, onEnd, onError }
    */
-  speakText(text, { pitch = 1.0, rate = 1.0, onStart, onEnd, onError } = {}) {
-    if (!this.synthesis) {
-      if (onError) onError("Speech Synthesis not supported");
+  async speakText(text, { pitch = 1.0, rate = 1.0, onStart, onEnd, onError } = {}) {
+    if (!this.deepgramApiKey) {
+      if (onError) onError("Deepgram API Key is missing for TTS.");
       return;
     }
 
-    // Cancel any active speech
-    this.synthesis.cancel();
-    // Sometimes Chrome gets stuck in a paused state
-    this.synthesis.resume();
+    this.stopSpeaking();
 
     // Clean text of markdown/tags if any remain
     const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
@@ -171,48 +139,56 @@ export class AudioEngine {
        return;
     }
 
-    console.log("TTS: Attempting to speak:", cleanText.substring(0, 50) + "...");
+    console.log("TTS: Requesting Deepgram Aura for:", cleanText.substring(0, 50) + "...");
 
-    // Small delay after cancel to prevent Chrome SpeechSynthesis bug
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      if (this.selectedVoice) {
-        utterance.voice = this.selectedVoice;
+    try {
+      this.isSpeaking = true;
+      if (onStart) onStart();
+
+      // Deepgram Aura Asteria (female, natural)
+      const response = await fetch("https://api.deepgram.com/v1/speak?model=aura-asteria-en", {
+        method: "POST",
+        headers: {
+          "Authorization": `Token ${this.deepgramApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text: cleanText })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Deepgram TTS failed: ${response.statusText}`);
       }
-      utterance.pitch = pitch || 1.0;
-      utterance.rate = rate || 1.0;
 
-      utterance.onstart = () => {
-        console.log("TTS: Speech started successfully.");
-        this.isSpeaking = true;
-        if (onStart) onStart();
-      };
-
-      utterance.onend = () => {
-        console.log("TTS: Speech ended.");
+      const arrayBuffer = await response.arrayBuffer();
+      
+      this._ensureAudioContext();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      this.ttsSource = this.audioContext.createBufferSource();
+      this.ttsSource.buffer = audioBuffer;
+      this.ttsSource.connect(this.audioContext.destination);
+      
+      this.ttsSource.onended = () => {
         this.isSpeaking = false;
         if (onEnd) onEnd();
       };
 
-      utterance.onerror = (e) => {
-        this.isSpeaking = false;
-        console.error("TTS Error:", e);
-        if (onError) onError(e);
-      };
+      this.ttsSource.start(0);
 
-      try {
-        this.synthesis.speak(utterance);
-      } catch (err) {
-        console.error("TTS: Failed to call speak()", err);
-      }
-    }, 100);
+    } catch (err) {
+      console.error("TTS Error:", err);
+      this.isSpeaking = false;
+      if (onError) onError(err);
+      if (onEnd) onEnd(); // gracefully recover
+    }
   }
 
   stopSpeaking() {
-    if (this.synthesis) {
-      this.synthesis.cancel();
-      this.isSpeaking = false;
+    if (this.ttsSource) {
+      try { this.ttsSource.stop(); } catch(e) {}
+      this.ttsSource = null;
     }
+    this.isSpeaking = false;
   }
 
   /**
