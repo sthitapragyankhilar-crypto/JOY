@@ -142,7 +142,7 @@ export class AudioEngine {
       this.socket.close();
       this.socket = null;
     }
-    this.stopMicVisualizer();
+    // Do NOT stop the mic visualizer/stream here, keep the hardware mic hot for the next turn
   }
 
   /**
@@ -163,28 +163,37 @@ export class AudioEngine {
     // Clean text of markdown/tags if any remain
     const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.voice = this.selectedVoice;
-    utterance.pitch = pitch;
-    utterance.rate = rate;
+    if (!cleanText) {
+       console.warn("TTS: No text to speak after cleaning.");
+       if (onEnd) onEnd();
+       return;
+    }
 
-    utterance.onstart = () => {
-      this.isSpeaking = true;
-      if (onStart) onStart();
-    };
+    // Small delay after cancel to prevent Chrome SpeechSynthesis bug
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.voice = this.selectedVoice;
+      utterance.pitch = pitch;
+      utterance.rate = rate;
 
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
+      utterance.onstart = () => {
+        this.isSpeaking = true;
+        if (onStart) onStart();
+      };
 
-    utterance.onerror = (e) => {
-      this.isSpeaking = false;
-      console.warn("Speech Synthesis Utterance Error:", e);
-      if (onError) onError(e);
-    };
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        if (onEnd) onEnd();
+      };
 
-    this.synthesis.speak(utterance);
+      utterance.onerror = (e) => {
+        this.isSpeaking = false;
+        console.warn("Speech Synthesis Utterance Error:", e);
+        if (onError) onError(e);
+      };
+
+      this.synthesis.speak(utterance);
+    }, 50);
   }
 
   stopSpeaking() {
@@ -222,7 +231,7 @@ export class AudioEngine {
   }
 
   /**
-   * Full cleanup — call on unmount.
+   * Full cleanup — call on unmount or full stop.
    */
   destroy() {
     this.stopListening();

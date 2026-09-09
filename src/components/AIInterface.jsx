@@ -303,6 +303,7 @@ export function AIInterface() {
     isContinuousModeRef.current = false;
     audioRef.current.stopListening();
     audioRef.current.stopSpeaking();
+    audioRef.current.stopMicVisualizer();
     setStageStatus('idle');
   };
 
