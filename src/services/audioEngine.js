@@ -159,6 +159,8 @@ export class AudioEngine {
 
     // Cancel any active speech
     this.synthesis.cancel();
+    // Sometimes Chrome gets stuck in a paused state
+    this.synthesis.resume();
 
     // Clean text of markdown/tags if any remain
     const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
@@ -169,31 +171,41 @@ export class AudioEngine {
        return;
     }
 
+    console.log("TTS: Attempting to speak:", cleanText.substring(0, 50) + "...");
+
     // Small delay after cancel to prevent Chrome SpeechSynthesis bug
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.voice = this.selectedVoice;
-      utterance.pitch = pitch;
-      utterance.rate = rate;
+      if (this.selectedVoice) {
+        utterance.voice = this.selectedVoice;
+      }
+      utterance.pitch = pitch || 1.0;
+      utterance.rate = rate || 1.0;
 
       utterance.onstart = () => {
+        console.log("TTS: Speech started successfully.");
         this.isSpeaking = true;
         if (onStart) onStart();
       };
 
       utterance.onend = () => {
+        console.log("TTS: Speech ended.");
         this.isSpeaking = false;
         if (onEnd) onEnd();
       };
 
       utterance.onerror = (e) => {
         this.isSpeaking = false;
-        console.warn("Speech Synthesis Utterance Error:", e);
+        console.error("TTS Error:", e);
         if (onError) onError(e);
       };
 
-      this.synthesis.speak(utterance);
-    }, 50);
+      try {
+        this.synthesis.speak(utterance);
+      } catch (err) {
+        console.error("TTS: Failed to call speak()", err);
+      }
+    }, 100);
   }
 
   stopSpeaking() {
