@@ -4,8 +4,8 @@
  */
 
 export class AudioEngine {
-  constructor() {
-    this.recognition = null;
+  constructor(deepgramApiKey = '') {
+    this.deepgramApiKey = deepgramApiKey;
     this.synthesis = window.speechSynthesis;
     this.audioContext = null;
     this.analyser = null;
@@ -14,22 +14,13 @@ export class AudioEngine {
     this.isSpeaking = false;
     this.voices = [];
     this.selectedVoice = null;
+    this.socket = null;
+    this.mediaRecorder = null;
 
-    this._initSpeechRecognition();
     this._initSpeechSynthesis();
   }
 
-  _initSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
-    } else {
-      console.warn("Speech Recognition API is not supported natively in this browser.");
-    }
-  }
+  // Native SpeechRecognition is removed in favor of Deepgram
 
   _initSpeechSynthesis() {
     if (!this.synthesis) return;
@@ -76,72 +67,80 @@ export class AudioEngine {
     this.analyser.smoothingTimeConstant = 0.8;
   }
 
-  /**
-   * Start listening to guest via microphone
-   */
-  startListening({ onTranscript, onError, onEnd }) {
-    if (!this.recognition) {
-      if (onError) onError("Speech Recognition not supported in this browser. Please use Google Chrome or Edge.");
+  async startListening({ onSpeakerTranscript, onSilenceDetected, onError, onEnd }) {
+    if (!this.deepgramApiKey) {
+      if (onError) onError("Deepgram API Key is missing. Please add it in settings.");
       return;
     }
-
+    
     this.isListening = true;
 
-    this.recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-
-      if (onTranscript) {
-        onTranscript({
-          interim: interimTranscript,
-          final: finalTranscript
-        });
-      }
-    };
-
-    this.recognition.onerror = (event) => {
-      console.warn("Speech Recognition Error:", event.error);
-      if (onError && event.error !== 'no-speech') {
-        onError(`Mic error: ${event.error}`);
-      }
-    };
-
-    this.recognition.onend = () => {
-      // Auto-restart if user still wants to listen
-      if (this.isListening) {
-        try {
-          this.recognition.start();
-        } catch (e) {
-          this.isListening = false;
-          if (onEnd) onEnd();
-        }
-      } else if (onEnd) {
-        onEnd();
-      }
-    };
-
     try {
-      this.recognition.start();
-      this.startMicVisualizer();
+      if (!this.mediaStream) {
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      this._ensureAudioContext();
+      
+      try {
+        const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+        source.connect(this.analyser);
+      } catch (e) {
+        // Ignored if already connected
+      }
+
+      this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
+      
+      const url = 'wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
+      this.socket = new WebSocket(url, ['token', this.deepgramApiKey]);
+      
+      this.socket.onopen = () => {
+        this.mediaRecorder.addEventListener('dataavailable', event => {
+          if (event.data.size > 0 && this.socket.readyState === 1) {
+            this.socket.send(event.data);
+          }
+        });
+        this.mediaRecorder.start(250);
+      };
+
+      this.socket.onmessage = (message) => {
+        const received = JSON.parse(message.data);
+        if (received.type === 'Results') {
+          const transcript = received.channel.alternatives[0].transcript;
+          const words = received.channel.alternatives[0].words;
+          
+          if (transcript && onSpeakerTranscript) {
+            let currentSpeaker = words.length > 0 && words[0].speaker !== undefined ? words[0].speaker : 0;
+            const isFinal = received.is_final;
+            onSpeakerTranscript(currentSpeaker, isFinal ? '' : transcript, isFinal ? transcript : '');
+          }
+        } else if (received.type === 'UtteranceEnd') {
+          if (onSilenceDetected) onSilenceDetected();
+        }
+      };
+
+      this.socket.onclose = () => {
+        if (this.isListening && onEnd) onEnd();
+      };
+      
+      this.socket.onerror = (e) => {
+        console.error("Deepgram WebSocket Error", e);
+        if (onError) onError("Deepgram WebSocket Error");
+      }
+
     } catch (e) {
-      console.error("Failed to start recognition:", e);
+      console.error("Mic error:", e);
+      if (onError) onError(e.message);
     }
   }
 
   stopListening() {
     this.isListening = false;
-    if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch (e) {}
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try { this.mediaRecorder.stop(); } catch(e) {}
+    }
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
     }
     this.stopMicVisualizer();
   }

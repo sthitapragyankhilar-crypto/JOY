@@ -29,9 +29,11 @@ export function AIInterface() {
   const agentRef = useRef(null);
   const audioRef = useRef(null);
   const audioContextPollerRef = useRef(null);
-  const silenceTimeoutRef = useRef(null);
   const guestTextRef = useRef('');
   const isContinuousModeRef = useRef(false);
+  const deepgramSpeakerRef = useRef(0);
+  const guestsRef = useRef(DEFAULT_GUESTS);
+  const activeGuestIdRef = useRef(DEFAULT_GUESTS[0].id);
 
   // Interface State
   const [stageStatus, setStageStatus] = useState('idle'); // idle, listening_guest, thinking, speaking_host
@@ -60,12 +62,18 @@ export function AIInterface() {
     topic: 'Scalable Autonomous Reasoning Agents',
     engine: 'groq',
     groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
+    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434'
   });
 
   const activeGuest = guests.find(g => g.id === activeGuestId) || guests[0];
   const hostPersona = HOST_PERSONAS[hostPersonaId] || HOST_PERSONAS.alex;
+
+  useEffect(() => {
+    guestsRef.current = guests;
+    activeGuestIdRef.current = activeGuestId;
+  }, [guests, activeGuestId]);
 
   // Initialize
   useEffect(() => {
@@ -74,7 +82,7 @@ export function AIInterface() {
       guests,
       hostPersonaId
     });
-    audioRef.current = new AudioEngine();
+    audioRef.current = new AudioEngine(config.deepgramApiKey);
 
     // Setup audio level polling for the sphere
     audioContextPollerRef.current = setInterval(() => {
@@ -102,7 +110,6 @@ export function AIInterface() {
     return () => {
       if (audioRef.current) audioRef.current.destroy();
       if (audioContextPollerRef.current) clearInterval(audioContextPollerRef.current);
-      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     };
   }, []);
 
@@ -184,33 +191,46 @@ export function AIInterface() {
     setInterimText('');
     guestTextRef.current = '';
     setStageStatus('listening_guest');
-    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
 
     audioRef.current.startListening({
-      onTranscript: ({ interim, final: finalText }) => {
+      onSpeakerTranscript: (speakerId, interim, finalText) => {
         setInterimText(interim);
+        deepgramSpeakerRef.current = speakerId;
+        
+        let existingGuest = guestsRef.current.find(g => g.audioId === speakerId);
+        if (!existingGuest) {
+          const newGuest = {
+            id: crypto.randomUUID(),
+            name: `Guest (Voice ${speakerId})`,
+            role: 'Guest Speaker',
+            color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
+            avatar: '👤',
+            bio: '',
+            audioId: speakerId
+          };
+          setGuests(prev => [...prev, newGuest]);
+          setActiveGuestId(newGuest.id);
+        } else if (activeGuestIdRef.current !== existingGuest.id) {
+          setActiveGuestId(existingGuest.id);
+        }
+
         if (finalText) {
           const newText = guestTextRef.current ? `${guestTextRef.current} ${finalText}` : finalText;
           setGuestText(newText);
           guestTextRef.current = newText;
         }
-
-        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-
-        silenceTimeoutRef.current = setTimeout(() => {
-          const currentText = guestTextRef.current || interim;
-          if (currentText.trim().length > 0) {
-            audioRef.current.stopListening();
-            processGuestAnswer(currentText.trim());
-          }
-        }, 3000);
+      },
+      onSilenceDetected: () => {
+        if (guestTextRef.current.trim().length > 0) {
+          audioRef.current.stopListening();
+          processGuestAnswer(guestTextRef.current.trim());
+        }
       }
     });
   };
 
   const handleToggleListening = () => {
     if (stageStatus === 'listening_guest') {
-      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       audioRef.current.stopListening();
       processGuestAnswer(guestTextRef.current || interimText);
     } else {
@@ -235,6 +255,24 @@ export function AIInterface() {
 
     try {
       const response = await agentRef.current.respondToGuest(answerText, activeGuestId);
+
+      if (response.renameSpeaker && response.renameSpeaker.name) {
+        setGuests(prev => prev.map(g => {
+          if (g.name === response.renameSpeaker.id || g.audioId === response.renameSpeaker.id) {
+            return { ...g, name: response.renameSpeaker.name };
+          }
+          return g;
+        }));
+        
+        setTranscript(prev => {
+          const newTx = [...prev];
+          const lastGuestMsgIdx = newTx.findLastIndex(m => m.sender === 'guest');
+          if (lastGuestMsgIdx !== -1) {
+            newTx[lastGuestMsgIdx].name = response.renameSpeaker.name;
+          }
+          return newTx;
+        });
+      }
 
       setTranscript(prev => [...prev, {
         sender: 'host',
@@ -265,7 +303,6 @@ export function AIInterface() {
     isContinuousModeRef.current = false;
     audioRef.current.stopListening();
     audioRef.current.stopSpeaking();
-    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     setStageStatus('idle');
   };
 

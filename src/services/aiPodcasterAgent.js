@@ -197,6 +197,9 @@ Before writing your verbal response, you MUST think logically inside <think>...<
 CRITICAL INSTRUCTION: Balance your responses to be engaging but not overly wordy. Provide 2-4 sentences of thoughtful commentary or reaction before asking your next question. Avoid long, monotonous monologues, but give enough substance to keep the conversation flowing naturally. 
 IMPORTANT: If the guest's statement is very short, seems cut off midway, or lacks enough context for a meaningful discussion, do not answer fully. Instead, tackle it by gently prompting them to continue or clarify (e.g., "You were saying?", "Could you elaborate on that?", or "I missed the end of that thought...").
 
+SPEAKER RECOGNITION:
+You are conversing with multiple speakers. If a guest introduces themselves (e.g. "Hi, I'm Mark"), you must output a tag <RENAME_SPEAKER><ID>Speaker 1</ID><NAME>Mark</NAME></RENAME_SPEAKER> inside your <think> block so the UI can rename them. Replace "Speaker 1" with their actual ID (which will be in the prompt if known, or "Guest (Voice 0)") and "Mark" with their name.
+
 FORMAT:
 <think>
 [Step-by-step analytical thoughts...]
@@ -381,11 +384,17 @@ Generate a warm, engaging opening podcast intro that sets up the topic, welcomes
   _parseThinkingAndResponse(rawText) {
     let thinking = "";
     let spokenResponse = rawText;
+    let renameSpeaker = null;
 
     const thinkMatch = rawText.match(/<think>([\s\S]*?)<\/think>/i);
     if (thinkMatch) {
       thinking = thinkMatch[1].trim();
       spokenResponse = rawText.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
+
+      const renameMatch = thinking.match(/<RENAME_SPEAKER>\s*<ID>(.*?)<\/ID>\s*<NAME>(.*?)<\/NAME>\s*<\/RENAME_SPEAKER>/i);
+      if (renameMatch) {
+        renameSpeaker = { id: renameMatch[1].trim(), name: renameMatch[2].trim() };
+      }
     } else {
       thinking = "Analyzing statement intent, retrieving RAG knowledge base facts, and formulating question as JOY...";
     }
@@ -393,6 +402,6 @@ Generate a warm, engaging opening podcast intro that sets up the topic, welcomes
     // Strip "JOY:" or "Joy:" from the start of the spoken response
     spokenResponse = spokenResponse.replace(/^JOY:\s*/i, "").trim();
 
-    return { thinking, spokenResponse };
+    return { thinking, spokenResponse, renameSpeaker };
   }
 }
