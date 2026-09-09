@@ -381,79 +381,24 @@ export function SettingsModal({
             <div className="form-group">
               <label className="form-label">Reasoning Engine</label>
               <p className="form-hint" style={{ marginBottom: '10px' }}>
-                Choose how JOY generates responses. Browser mode works offline with heuristic responses.
+                JOY is currently set to use the ⚡ Groq API (Fast, Free Tier).
               </p>
-              <div className="radio-group">
-                {[
-                  { id: 'browser', label: '🌐 Browser (Free, Offline)' },
-                  { id: 'groq', label: '⚡ Groq API (Fast, Free Tier)' },
-                  { id: 'ollama', label: '🦙 Local Ollama (Private)' },
-                ].map(opt => (
-                  <div
-                    key={opt.id}
-                    className={`radio-option ${localConfig.engine === opt.id ? 'radio-option--active' : ''}`}
-                    onClick={() => updateLocalConfig('engine', opt.id)}
-                    role="radio"
-                    aria-checked={localConfig.engine === opt.id}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        updateLocalConfig('engine', opt.id);
-                      }
-                    }}
-                  >
-                    {opt.label}
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Groq API Key */}
-            {localConfig.engine === 'groq' && (
-              <div className="form-group animate-fade-in">
-                <label className="form-label">Groq API Key</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={localConfig.groqApiKey}
-                  onChange={e => updateLocalConfig('groqApiKey', e.target.value)}
-                  placeholder="gsk_your_groq_api_key_here"
-                />
-                <p className="form-hint">
-                  Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>console.groq.com</a>
-                </p>
-              </div>
-            )}
-
-            {/* Ollama Settings */}
-            {localConfig.engine === 'ollama' && (
-              <div className="animate-fade-in">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Ollama Model</label>
-                    <input
-                      className="form-input"
-                      value={localConfig.ollamaModel}
-                      onChange={e => updateLocalConfig('ollamaModel', e.target.value)}
-                      placeholder="llama3.2"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Ollama URL</label>
-                    <input
-                      className="form-input"
-                      value={localConfig.ollamaUrl}
-                      onChange={e => updateLocalConfig('ollamaUrl', e.target.value)}
-                      placeholder="http://localhost:11434"
-                    />
-                  </div>
-                </div>
-                <p className="form-hint">
-                  Make sure Ollama is running locally. Install from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>ollama.com</a>
-                </p>
-              </div>
-            )}
+            <div className="form-group animate-fade-in">
+              <label className="form-label">Groq API Key</label>
+              <input
+                className="form-input"
+                type="password"
+                value={localConfig.groqApiKey}
+                onChange={e => updateLocalConfig('groqApiKey', e.target.value)}
+                placeholder="gsk_your_groq_api_key_here"
+              />
+              <p className="form-hint">
+                Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>console.groq.com</a>
+              </p>
+            </div>
           </div>
         )}
       </div>

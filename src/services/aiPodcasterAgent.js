@@ -86,7 +86,7 @@ export class AIPodcasterAgent {
     this.history = [];
     this.usedTemplates = new Set();
 
-    this.engine = config.engine || "browser";
+    this.engine = config.engine || "groq";
     this.groqApiKey = config.groqApiKey || import.meta.env.VITE_GROQ_API_KEY || "";
     this.ollamaModel = config.ollamaModel || "llama3.2";
     this.ollamaUrl = config.ollamaUrl || "http://localhost:11434";
@@ -194,6 +194,9 @@ Before writing your verbal response, you MUST think logically inside <think>...<
 3. Determine whether to probe deeper or move the conversation forward.
 4. Formulate a natural podcast follow-up question.
 
+CRITICAL INSTRUCTION: Balance your responses to be engaging but not overly wordy. Provide 2-4 sentences of thoughtful commentary or reaction before asking your next question. Avoid long, monotonous monologues, but give enough substance to keep the conversation flowing naturally. 
+IMPORTANT: If the guest's statement is very short, seems cut off midway, or lacks enough context for a meaningful discussion, do not answer fully. Instead, tackle it by gently prompting them to continue or clarify (e.g., "You were saying?", "Could you elaborate on that?", or "I missed the end of that thought...").
+
 FORMAT:
 <think>
 [Step-by-step analytical thoughts...]
@@ -217,7 +220,7 @@ ${guestLine}
 Retrieved Guest Background from RAG:
 ${factContext || 'No background documents indexed yet.'}
 
-Generate an engaging opening podcast intro that welcomes all guests and asks your first question. Include <think>...</think> reasoning steps.`;
+Generate a warm, engaging opening podcast intro that sets up the topic, welcomes all guests, and asks a thoughtful first question. Keep it to about 3-5 sentences to maintain good pacing. Include <think>...</think> reasoning steps.`;
 
     return await this._processLLMRequest([
       { role: "system", content: this._buildSystemPrompt() },

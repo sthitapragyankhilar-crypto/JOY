@@ -132,7 +132,7 @@ export function MemoryPanel({
                 <div className="memory-item__icon memory-item__icon--config">
                   <Cpu size={13} />
                 </div>
-                <span>Engine: {config.engine === 'browser' ? '🌐 Browser' : config.engine === 'groq' ? '⚡ Groq' : '🦙 Ollama'}</span>
+                <span>Engine: ⚡ Groq</span>
               </div>
 
               <div className="memory-item">

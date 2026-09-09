@@ -29,6 +29,9 @@ export function AIInterface() {
   const agentRef = useRef(null);
   const audioRef = useRef(null);
   const audioContextPollerRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const guestTextRef = useRef('');
+  const isContinuousModeRef = useRef(false);
 
   // Interface State
   const [stageStatus, setStageStatus] = useState('idle'); // idle, listening_guest, thinking, speaking_host
@@ -55,8 +58,8 @@ export function AIInterface() {
   const [config, setConfig] = useState({
     conferenceName: 'Tech AI Summit 2026',
     topic: 'Scalable Autonomous Reasoning Agents',
-    engine: 'browser',
-    groqApiKey: '',
+    engine: 'groq',
+    groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434'
   });
@@ -99,6 +102,7 @@ export function AIInterface() {
     return () => {
       if (audioRef.current) audioRef.current.destroy();
       if (audioContextPollerRef.current) clearInterval(audioContextPollerRef.current);
+      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     };
   }, []);
 
@@ -142,6 +146,7 @@ export function AIInterface() {
   };
 
   const handleStartInterview = async () => {
+    isContinuousModeRef.current = true;
     setStageStatus('thinking');
 
     try {
@@ -159,7 +164,13 @@ export function AIInterface() {
         pitch: hostPersona.pitch,
         rate: hostPersona.rate,
         onStart: () => audioRef.current.startMicVisualizer(), // reuse mic for output viz if needed
-        onEnd: () => setStageStatus('idle')
+        onEnd: () => {
+          if (isContinuousModeRef.current) {
+            handleStartListening();
+          } else {
+            setStageStatus('idle');
+          }
+        }
       });
     } catch (err) {
       console.error("Error generating intro:", err);
@@ -167,30 +178,44 @@ export function AIInterface() {
     }
   };
 
+  const handleStartListening = () => {
+    audioRef.current.stopSpeaking();
+    setGuestText('');
+    setInterimText('');
+    guestTextRef.current = '';
+    setStageStatus('listening_guest');
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+
+    audioRef.current.startListening({
+      onTranscript: ({ interim, final: finalText }) => {
+        setInterimText(interim);
+        if (finalText) {
+          const newText = guestTextRef.current ? `${guestTextRef.current} ${finalText}` : finalText;
+          setGuestText(newText);
+          guestTextRef.current = newText;
+        }
+
+        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+
+        silenceTimeoutRef.current = setTimeout(() => {
+          const currentText = guestTextRef.current || interim;
+          if (currentText.trim().length > 0) {
+            audioRef.current.stopListening();
+            processGuestAnswer(currentText.trim());
+          }
+        }, 3000);
+      }
+    });
+  };
+
   const handleToggleListening = () => {
     if (stageStatus === 'listening_guest') {
+      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       audioRef.current.stopListening();
-      if (guestText.trim()) {
-        processGuestAnswer(guestText.trim());
-      } else if (interimText.trim()) {
-        processGuestAnswer(interimText.trim());
-      } else {
-        setStageStatus('idle');
-      }
+      processGuestAnswer(guestTextRef.current || interimText);
     } else {
-      audioRef.current.stopSpeaking();
-      setGuestText('');
-      setInterimText('');
-      setStageStatus('listening_guest');
-
-      audioRef.current.startListening({
-        onTranscript: ({ interim, final: finalText }) => {
-          setInterimText(interim);
-          if (finalText) {
-            setGuestText(prev => prev ? `${prev} ${finalText}` : finalText);
-          }
-        }
-      });
+      isContinuousModeRef.current = true;
+      handleStartListening();
     }
   };
 
@@ -222,7 +247,13 @@ export function AIInterface() {
       audioRef.current.speakText(response.spokenResponse, {
         pitch: hostPersona.pitch,
         rate: hostPersona.rate,
-        onEnd: () => setStageStatus('idle')
+        onEnd: () => {
+          if (isContinuousModeRef.current) {
+            handleStartListening();
+          } else {
+            setStageStatus('idle');
+          }
+        }
       });
     } catch (err) {
       console.error("Error processing response:", err);
@@ -231,11 +262,11 @@ export function AIInterface() {
   };
 
   const handleStop = () => {
+    isContinuousModeRef.current = false;
     audioRef.current.stopListening();
     audioRef.current.stopSpeaking();
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     setStageStatus('idle');
-    setGuestText('');
-    setInterimText('');
   };
 
   return (
