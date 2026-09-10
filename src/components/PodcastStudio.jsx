@@ -32,6 +32,7 @@ export function PodcastStudio() {
   const silenceTimeoutRef = useRef(null);
   const guestTextRef = useRef('');
   const isContinuousModeRef = useRef(false);
+  const currentSpeakerGuestIdRef = useRef(null);
 
   // Studio State
   const [stageStatus, setStageStatus] = useState('idle');
@@ -62,6 +63,7 @@ export function PodcastStudio() {
     topic: 'Scalable Autonomous Reasoning Agents',
     engine: 'groq',
     groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
+    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434'
   });
@@ -79,7 +81,7 @@ export function PodcastStudio() {
       guests,
       hostPersonaId
     });
-    audioRef.current = new AudioEngine();
+    audioRef.current = new AudioEngine(config.deepgramApiKey);
 
     return () => {
       if (audioRef.current) {
@@ -95,6 +97,9 @@ export function PodcastStudio() {
   useEffect(() => {
     if (agentRef.current) {
       agentRef.current.setEngineConfig(config);
+    }
+    if (audioRef.current) {
+      audioRef.current.deepgramApiKey = config.deepgramApiKey;
     }
   }, [config]);
 
@@ -188,7 +193,17 @@ export function PodcastStudio() {
     if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
 
     audioRef.current.startListening({
-      onTranscript: ({ interim, final: finalText }) => {
+      onSpeakerTranscript: (speakerId, interim, finalText) => {
+        // Automatically switch guest based on Deepgram's speakerId
+        if (guests.length > 0) {
+          const guestIndex = speakerId % guests.length;
+          const assignedGuest = guests[guestIndex];
+          if (assignedGuest) {
+            setActiveGuestId(assignedGuest.id);
+            currentSpeakerGuestIdRef.current = assignedGuest.id;
+          }
+        }
+
         setInterimText(interim);
         if (finalText) {
           const newText = guestTextRef.current ? `${guestTextRef.current} ${finalText}` : finalText;
@@ -204,7 +219,7 @@ export function PodcastStudio() {
           const currentText = guestTextRef.current || interim;
           if (currentText.trim().length > 0) {
             audioRef.current.stopListening();
-            processGuestAnswer(currentText.trim());
+            processGuestAnswer(currentText.trim(), currentSpeakerGuestIdRef.current);
           }
         }, 3000);
       }
@@ -216,11 +231,12 @@ export function PodcastStudio() {
     }, 300);
   };
 
-  const processGuestAnswer = async (answerText) => {
+  const processGuestAnswer = async (answerText, overrideGuestId = null) => {
     const textToProcess = answerText || guestText;
     if (!textToProcess.trim()) return;
 
-    const speakerGuest = activeGuest;
+    const guestIdToUse = overrideGuestId || activeGuestId;
+    const speakerGuest = guests.find(g => g.id === guestIdToUse) || guests[0];
 
     setTranscript(prev => [...prev, {
       sender: 'guest',
@@ -244,7 +260,7 @@ export function PodcastStudio() {
     setCurrentThinking(`JOY is searching RAG vector store for context related to: "${textToProcess.substring(0, 40)}..."`);
 
     try {
-      const response = await agentRef.current.respondToGuest(textToProcess, activeGuestId);
+      const response = await agentRef.current.respondToGuest(textToProcess, guestIdToUse);
       setCurrentThinking(response.thinking);
       setRetrievedSnippets(response.retrievedChunks || []);
 

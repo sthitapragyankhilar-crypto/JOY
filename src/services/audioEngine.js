@@ -131,7 +131,13 @@ export class AudioEngine {
     this.stopSpeaking();
 
     // Clean text of markdown/tags if any remain
-    const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
+    let cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
+
+    // Normalization for Deepgram Aura TTS quirks with abbreviations
+    cleanText = cleanText
+      .replace(/\bDr\./g, "Doctor")
+      .replace(/\bPh\.?D\.?/gi, "P H D")
+      .replace(/\bProf\./g, "Professor");
 
     if (!cleanText) {
        console.warn("TTS: No text to speak after cleaning.");
