@@ -300,7 +300,12 @@ export function PodcastStudio() {
           const { type, name } = response.renameSpeaker;
           
           if (type === 'map') {
-              const matchedGuest = guests.find(g => g.name.toLowerCase().includes(name.toLowerCase().split(' ')[0]));
+              const searchName = name.toLowerCase().trim();
+              const matchedGuest = guests.find(g => 
+                  g.name.toLowerCase().includes(searchName) || 
+                  g.name.toLowerCase().includes(searchName.split(' ')[0]) ||
+                  g.role.toLowerCase().includes(searchName)
+              );
               if (matchedGuest && currentDeepgramSpeakerIdRef.current !== null) {
                   speakerIdMapRef.current[currentDeepgramSpeakerIdRef.current] = matchedGuest.id;
                   
