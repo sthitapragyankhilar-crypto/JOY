@@ -126,6 +126,13 @@ export function PodcastStudio() {
 
   const handleSelectGuest = useCallback((guestId) => {
     setActiveGuestId(guestId);
+    
+    // Hybrid Override: If a speaker is currently talking and the operator clicks a guest,
+    // force Deepgram's current speaker ID to map to this newly clicked guest forever!
+    if (currentDeepgramSpeakerIdRef.current !== null) {
+      speakerIdMapRef.current[currentDeepgramSpeakerIdRef.current] = guestId;
+      currentSpeakerGuestIdRef.current = guestId;
+    }
   }, []);
 
   const handleUploadKnowledge = () => {
@@ -210,12 +217,11 @@ export function PodcastStudio() {
           let assignedGuestId = speakerIdMapRef.current[speakerId];
           if (!assignedGuestId) {
              const mappedGuestIds = Object.values(speakerIdMapRef.current);
+             const unmappedGuests = guests.filter(g => !mappedGuestIds.includes(g.id) && g.role !== 'Audience Q&A');
              
-             if (!mappedGuestIds.includes(activeGuestId)) {
-                 // Map the new voice to the manually selected active guest
-                 assignedGuestId = activeGuestId;
+             if (unmappedGuests.length > 0) {
+                 assignedGuestId = unmappedGuests[0].id;
              } else {
-                 // Active guest is already mapped, so this is an unexpected new voice
                  assignedGuestId = `audience-${speakerId}`;
                  setGuests(prev => [...prev, {
                      id: assignedGuestId,
