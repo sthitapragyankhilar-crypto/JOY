@@ -36,6 +36,10 @@ export class RAGKnowledgeBase {
     });
   }
 
+  deleteDocument(sourceTitle) {
+    this.chunks = this.chunks.filter(chunk => chunk.source !== sourceTitle);
+  }
+
   search(query, topK = 3) {
     if (this.chunks.length === 0 || !query || !query.trim()) return [];
 
@@ -144,6 +148,13 @@ export class AIPodcasterAgent {
    */
   uploadKnowledgeDocument(sourceTitle, textContent, guestId = null) {
     this.ragKB.addDocument(sourceTitle, textContent, { guestId });
+  }
+
+  /**
+   * Delete a knowledge document by title.
+   */
+  deleteKnowledgeDocument(sourceTitle) {
+    this.ragKB.deleteDocument(sourceTitle);
   }
 
   /**

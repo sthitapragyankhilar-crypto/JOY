@@ -53,9 +53,7 @@ export function PodcastStudio() {
 
   // RAG Knowledge State
   const [knowledgeText, setKnowledgeText] = useState('');
-  const [indexedDocs, setIndexedDocs] = useState([
-    "Dr. Sarah Lin - VP of AI Research (Distributed Neural Reasoning & Sparse Attention, 2025)"
-  ]);
+  const [indexedDocs, setIndexedDocs] = useState([]);
 
   // Config State
   const [config, setConfig] = useState({
@@ -130,13 +128,19 @@ export function PodcastStudio() {
 
   const handleUploadKnowledge = () => {
     if (!knowledgeText.trim()) return;
+    const title = `User_Upload_${Date.now()}`;
     agentRef.current.uploadKnowledgeDocument(
-      `User_Upload_${indexedDocs.length + 1}`,
+      title,
       knowledgeText,
       activeGuestId
     );
-    setIndexedDocs(prev => [...prev, `${knowledgeText.substring(0, 50)}...`]);
+    setIndexedDocs(prev => [...prev, { id: crypto.randomUUID(), title, guestId: activeGuestId }]);
     setKnowledgeText('');
+  };
+
+  const handleDeleteKnowledge = (id, title) => {
+    agentRef.current.deleteKnowledgeDocument(title);
+    setIndexedDocs(prev => prev.filter(doc => doc.id !== id));
   };
 
   const handleStartInterview = async () => {
@@ -532,9 +536,12 @@ export function PodcastStudio() {
             </button>
 
             <div style={{ marginTop: '14px', fontSize: '0.78rem', color: 'var(--accent-emerald)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {indexedDocs.map((doc, idx) => (
-                <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeft: '3px solid var(--accent-emerald)', padding: '6px 8px', borderRadius: '4px' }}>
-                  ✓ {doc}
+              {indexedDocs.map((doc) => (
+                <div key={doc.id} style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeft: '3px solid var(--accent-emerald)', padding: '6px 8px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>✓ {doc.title}</span>
+                  <button onClick={() => handleDeleteKnowledge(doc.id, doc.title)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2em' }}>
+                    &times;
+                  </button>
                 </div>
               ))}
             </div>

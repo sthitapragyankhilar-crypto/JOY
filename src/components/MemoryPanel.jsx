@@ -27,9 +27,18 @@ export function MemoryPanel({
   config,
   guests,
   transcript,
-  activeGuestName
+  activeGuestName,
+  onDeleteKnowledge
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [selectedGuestId, setSelectedGuestId] = useState(guests[0]?.id || '');
+
+  // Update selected guest if guests change
+  React.useEffect(() => {
+    if (guests.length > 0 && !guests.find(g => g.id === selectedGuestId)) {
+      setSelectedGuestId(guests[0].id);
+    }
+  }, [guests, selectedGuestId]);
 
   const turnCount = transcript.length;
   const hostTurns = transcript.filter(m => m.sender === 'host').length;
@@ -63,14 +72,22 @@ export function MemoryPanel({
                 <FileText size={13} /> Knowledge Sources ({indexedDocs.length})
               </div>
 
-              {indexedDocs.map((doc, idx) => (
-                <div key={idx} className="memory-item">
+              {indexedDocs.map((doc) => (
+                <div key={doc.id} className="memory-item" style={{ alignItems: 'flex-start' }}>
                   <div className="memory-item__icon memory-item__icon--doc">
                     <FileText size={13} />
                   </div>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {doc}
-                  </span>
+                  <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>{doc.title}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)' }}>Tagged to: {guests.find(g => g.id === doc.guestId)?.name || 'Unknown'}</span>
+                  </div>
+                  <button 
+                    onClick={() => onDeleteKnowledge(doc.id, doc.title)}
+                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                    title="Delete Source"
+                  >
+                    <X size={13} />
+                  </button>
                 </div>
               ))}
 
@@ -86,6 +103,15 @@ export function MemoryPanel({
 
               {uploadOpen && (
                 <div className="knowledge-upload" style={{ marginTop: '10px' }}>
+                  <select 
+                    value={selectedGuestId} 
+                    onChange={e => setSelectedGuestId(e.target.value)}
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', outline: 'none' }}
+                  >
+                    {guests.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
                   <textarea
                     rows={4}
                     value={knowledgeText}
@@ -95,14 +121,14 @@ export function MemoryPanel({
                   <button
                     className="knowledge-upload__btn"
                     onClick={() => {
-                      onUploadKnowledge();
+                      onUploadKnowledge(selectedGuestId);
                       setUploadOpen(false);
                     }}
                     disabled={!knowledgeText.trim()}
                     style={{ opacity: knowledgeText.trim() ? 1 : 0.5 }}
                   >
                     <Database size={13} />
-                    Index to RAG{activeGuestName ? ` (${activeGuestName})` : ''}
+                    Index to RAG
                   </button>
                 </div>
               )}

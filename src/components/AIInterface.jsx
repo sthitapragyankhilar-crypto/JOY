@@ -49,9 +49,7 @@ export function AIInterface() {
   const [interimText, setInterimText] = useState('');
   const [guestText, setGuestText] = useState('');
   const [knowledgeText, setKnowledgeText] = useState('');
-  const [indexedDocs, setIndexedDocs] = useState([
-    "Dr. Sarah Lin - VP of AI Research (Distributed Neural Reasoning & Sparse Attention, 2025)"
-  ]);
+  const [indexedDocs, setIndexedDocs] = useState([]);
 
   // Config State
   const [guests, setGuests] = useState(DEFAULT_GUESTS);
@@ -141,15 +139,21 @@ export function AIInterface() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   });
 
-  const handleUploadKnowledge = () => {
+  const handleUploadKnowledge = (guestId) => {
     if (!knowledgeText.trim()) return;
+    const title = `User_Upload_${Date.now()}`;
     agentRef.current.uploadKnowledgeDocument(
-      `User_Upload_${indexedDocs.length + 1}`,
+      title,
       knowledgeText,
-      activeGuestId
+      guestId
     );
-    setIndexedDocs(prev => [...prev, `${knowledgeText.substring(0, 50)}...`]);
+    setIndexedDocs(prev => [...prev, { id: crypto.randomUUID(), title, guestId }]);
     setKnowledgeText('');
+  };
+
+  const handleDeleteKnowledge = (id, title) => {
+    agentRef.current.deleteKnowledgeDocument(title);
+    setIndexedDocs(prev => prev.filter(doc => doc.id !== id));
   };
 
   const handleStartInterview = async () => {
@@ -375,6 +379,7 @@ export function AIInterface() {
           knowledgeText={knowledgeText}
           onKnowledgeTextChange={setKnowledgeText}
           onUploadKnowledge={handleUploadKnowledge}
+          onDeleteKnowledge={handleDeleteKnowledge}
           config={config}
           guests={guests}
           transcript={transcript}
