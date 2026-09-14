@@ -207,6 +207,7 @@ Before writing your verbal response, you MUST think logically inside <think>...<
 CRITICAL INSTRUCTION: Your responses MUST be highly conversational, brief, and sound like a real spoken podcast, not a written essay. 
 - Keep responses strictly under 2-3 short sentences.
 - Ask ONLY ONE clear question at a time (if talking to a guest). Do NOT ask multi-part questions.
+- If a guest or host asks a direct question (e.g. for recommendations, facts, spots, places), you MUST answer it directly first before steering the conversation back. Do not ignore their question.
 - Do NOT list out multiple examples in parentheses when asking a question. Speak naturally.
 - Avoid dense, essay-like text blocks.
 
@@ -216,7 +217,9 @@ CO-HOST DYNAMIC:
 If the speaker is listed as a "Host" or "Co-Host" in the PANEL GUESTS list, they are your human partner. NEVER interview them. If they explicitly hand the conversation over to you or ask you to take the lead, direct a new interview question to one of the guests. If they don't hand it over, simply banter and leave the floor open for your co-host to continue.
 
 SPEAKER RECOGNITION:
-You are conversing with multiple speakers. If a guest introduces themselves (e.g. "Hi, I'm Mark"), you must output a tag <RENAME_SPEAKER><ID>Speaker 1</ID><NAME>Mark</NAME></RENAME_SPEAKER> inside your <think> block so the UI can rename them. Replace "Speaker 1" with their actual ID (which will be in the prompt if known, or "Guest (Voice 0)") and "Mark" with their name.
+You are conversing with multiple speakers.
+- If the current speaker says something that clearly identifies them as one of the PANEL GUESTS (e.g. "This is your host, Sthita" or "I'm Shalini"), output a tag <MAP_SPEAKER>Their Name</MAP_SPEAKER> inside your <think> block. This maps them to their existing profile.
+- If the current speaker introduces themselves as someone NEW from the audience (e.g. "Hi JOY, my name is Sankalp"), output a tag <RENAME_SPEAKER>Sankalp</RENAME_SPEAKER> inside your <think> block to update their display name dynamically.
 
 FORMAT:
 <think>
@@ -283,6 +286,10 @@ Generate a warm, engaging opening podcast intro that sets up the topic, welcomes
           : m.content
       }))
     ]);
+
+    if (response.renameSpeaker) {
+        this.history[this.history.length - 1].guestName = response.renameSpeaker.name;
+    }
 
     this.history.push({ role: "host", content: response.spokenResponse });
 
@@ -409,9 +416,14 @@ Generate a warm, engaging opening podcast intro that sets up the topic, welcomes
       thinking = thinkMatch[1].trim();
       spokenResponse = rawText.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
 
-      const renameMatch = thinking.match(/<RENAME_SPEAKER>\s*<ID>(.*?)<\/ID>\s*<NAME>(.*?)<\/NAME>\s*<\/RENAME_SPEAKER>/i);
+      const mapMatch = thinking.match(/<MAP_SPEAKER>\s*(.*?)\s*<\/MAP_SPEAKER>/i);
+      if (mapMatch) {
+        renameSpeaker = { type: 'map', name: mapMatch[1].trim() };
+      }
+
+      const renameMatch = thinking.match(/<RENAME_SPEAKER>\s*(.*?)\s*<\/RENAME_SPEAKER>/i);
       if (renameMatch) {
-        renameSpeaker = { id: renameMatch[1].trim(), name: renameMatch[2].trim() };
+        renameSpeaker = { type: 'rename', name: renameMatch[1].trim() };
       }
     } else {
       thinking = "Analyzing statement intent, retrieving RAG knowledge base facts, and formulating question as JOY...";

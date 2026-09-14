@@ -38,7 +38,7 @@ export class AudioEngine {
     this.analyser.smoothingTimeConstant = 0.8;
   }
 
-  async startListening({ onSpeakerTranscript, onSilenceDetected, onError, onEnd }) {
+  async startListening({ onSpeakerTranscript, onSilenceDetected, onError, onEnd, keywords = [] }) {
     if (!this.deepgramApiKey) {
       if (onError) onError("Deepgram API Key is missing. Please add it in settings.");
       return;
@@ -61,7 +61,14 @@ export class AudioEngine {
 
       this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
       
-      const url = 'wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
+      let url = 'wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
+      if (keywords && keywords.length > 0) {
+        // Unique keywords
+        const uniqueKeywords = [...new Set(keywords)];
+        uniqueKeywords.forEach(kw => {
+          url += `&keywords=${encodeURIComponent(kw)}:10`;
+        });
+      }
       this.socket = new WebSocket(url, ['token', this.deepgramApiKey]);
       
       this.socket.onopen = () => {

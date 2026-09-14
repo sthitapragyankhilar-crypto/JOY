@@ -33,6 +33,8 @@ export function PodcastStudio() {
   const guestTextRef = useRef('');
   const isContinuousModeRef = useRef(false);
   const currentSpeakerGuestIdRef = useRef(null);
+  const speakerIdMapRef = useRef({});
+  const currentDeepgramSpeakerIdRef = useRef(null);
 
   // Studio State
   const [stageStatus, setStageStatus] = useState('idle');
@@ -196,15 +198,41 @@ export function PodcastStudio() {
     setStageStatus('listening_guest');
     if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
 
+    const guestKeywords = guests
+      .flatMap(g => g.name.replace(/\./g, ' ').replace(/[^a-zA-Z ]/g, '').split(/\s+/))
+      .filter(n => n.length > 2);
+
     audioRef.current.startListening({
+      keywords: guestKeywords,
       onSpeakerTranscript: (speakerId, interim, finalText) => {
-        // Automatically switch guest based on Deepgram's speakerId
+        // Switch guest based on Deepgram's speakerId mapping
         if (guests.length > 0) {
-          const guestIndex = speakerId % guests.length;
-          const assignedGuest = guests[guestIndex];
+          let assignedGuestId = speakerIdMapRef.current[speakerId];
+          if (!assignedGuestId) {
+             const mappedGuestIds = Object.values(speakerIdMapRef.current);
+             const unmappedGuests = guests.filter(g => !mappedGuestIds.includes(g.id) && g.role !== 'Audience Q&A');
+             
+             if (unmappedGuests.length > 0) {
+                 assignedGuestId = unmappedGuests[0].id;
+             } else {
+                 assignedGuestId = `audience-${speakerId}`;
+                 setGuests(prev => [...prev, {
+                     id: assignedGuestId,
+                     name: `Audience (Mic ${speakerId})`,
+                     role: 'Audience Q&A',
+                     color: '#94a3b8',
+                     avatar: '🙋',
+                     bio: '',
+                     isActive: true
+                 }]);
+             }
+             speakerIdMapRef.current[speakerId] = assignedGuestId;
+          }
+          const assignedGuest = guests.find(g => g.id === assignedGuestId);
           if (assignedGuest) {
             setActiveGuestId(assignedGuest.id);
             currentSpeakerGuestIdRef.current = assignedGuest.id;
+            currentDeepgramSpeakerIdRef.current = speakerId;
           }
         }
 
@@ -267,6 +295,38 @@ export function PodcastStudio() {
       const response = await agentRef.current.respondToGuest(textToProcess, guestIdToUse);
       setCurrentThinking(response.thinking);
       setRetrievedSnippets(response.retrievedChunks || []);
+
+      if (response.renameSpeaker) {
+          const { type, name } = response.renameSpeaker;
+          
+          if (type === 'map') {
+              const matchedGuest = guests.find(g => g.name.toLowerCase().includes(name.toLowerCase().split(' ')[0]));
+              if (matchedGuest && currentDeepgramSpeakerIdRef.current !== null) {
+                  speakerIdMapRef.current[currentDeepgramSpeakerIdRef.current] = matchedGuest.id;
+                  
+                  setTranscript(prev => {
+                      const newTranscript = [...prev];
+                      const lastGuestMsgIdx = newTranscript.findLastIndex(m => m.sender === 'guest');
+                      if (lastGuestMsgIdx !== -1) {
+                          newTranscript[lastGuestMsgIdx].name = matchedGuest.name;
+                          newTranscript[lastGuestMsgIdx].guestColor = matchedGuest.color;
+                      }
+                      return newTranscript;
+                  });
+              }
+          } else if (type === 'rename') {
+              setGuests(prev => prev.map(g => g.id === guestIdToUse ? { ...g, name } : g));
+              
+              setTranscript(prev => {
+                  const newTranscript = [...prev];
+                  const lastGuestMsgIdx = newTranscript.findLastIndex(m => m.sender === 'guest');
+                  if (lastGuestMsgIdx !== -1) {
+                      newTranscript[lastGuestMsgIdx].name = name;
+                  }
+                  return newTranscript;
+              });
+          }
+      }
 
       setTranscript(prev => [...prev, {
         sender: 'host',
