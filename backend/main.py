@@ -7,12 +7,11 @@ Stack:
  - Text-to-Speech: Edge-TTS (Microsoft Neural Voice - hyper-realistic & free)
 """
 
-import os
 import re
 import tempfile
-import asyncio
-from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+import traceback
+from typing import List
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -24,7 +23,7 @@ app = FastAPI(title="JOY - RAG AI Podcaster Agent Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -128,9 +127,8 @@ async def proxy_chat(req: ProxyChatRequest):
         )
         return response.model_dump()
     except Exception as e:
-        import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Groq execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Groq execution error: {str(e)}") from e
 
 @app.post("/api/tts")
 async def synthesize_speech(text: str = Form(...), voice: str = Form("en-US-AvaNeural")):
@@ -147,9 +145,8 @@ async def synthesize_speech(text: str = Form(...), voice: str = Form("en-US-AvaN
 
         return FileResponse(output_path, media_type="audio/mpeg", filename="joy_voice.mp3")
     except Exception as e:
-        import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"TTS synthesis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"TTS synthesis error: {str(e)}") from e
 
 if __name__ == "__main__":
     import uvicorn
