@@ -95,7 +95,7 @@ export class AIPodcasterAgent {
     this.ollamaModel = config.ollamaModel || "llama3.2";
     this.ollamaUrl = config.ollamaUrl || "http://localhost:11434";
 
-    this.scriptGoal = null;
+    this.scriptText = "";
 
     // Index initial guest bios
     this._indexGuestBios();
@@ -146,10 +146,10 @@ export class AIPodcasterAgent {
   }
 
   /**
-   * Set the current script goal to steer the conversation.
+   * Set the global podcast script text to steer the conversation.
    */
-  setScriptGoal(goal) {
-    this.scriptGoal = goal;
+  setScriptText(text) {
+    this.scriptText = text;
   }
 
   /**
@@ -199,10 +199,8 @@ export class AIPodcasterAgent {
     const guestContext = this._buildGuestContext();
 
     let scriptContext = "";
-    if (this.scriptGoal) {
-      const targetGuest = this._getGuest(this.scriptGoal.targetGuestId);
-      const targetName = targetGuest ? targetGuest.name : "the guest";
-      scriptContext = `\nSCRIPT GOAL:\nYour immediate goal in this turn is to ask ${targetName} the following question: "${this.scriptGoal.text}". Organically bridge the conversation toward this question.\n`;
+    if (this.scriptText && this.scriptText.trim().length > 0) {
+      scriptContext = `\nPODCAST SCRIPT TO FOLLOW:\n${this.scriptText}\n\nCRITICAL: You must organically follow the above script during the podcast. Guide the discussion through these points.\n`;
     }
 
     return `You are JOY, an intelligent AI podcast host at ${this.conferenceName}.

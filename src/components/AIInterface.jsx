@@ -49,6 +49,7 @@ export function AIInterface() {
   const [interimText, setInterimText] = useState('');
   const [guestText, setGuestText] = useState('');
   const [knowledgeText, setKnowledgeText] = useState('');
+  const [scriptText, setScriptText] = useState('');
   const [indexedDocs, setIndexedDocs] = useState([]);
 
   // Config State
@@ -117,8 +118,9 @@ export function AIInterface() {
       agentRef.current.setEngineConfig(config);
       agentRef.current.setGuests(guests);
       agentRef.current.setHostPersona(hostPersonaId);
+      agentRef.current.setScriptText(scriptText);
     }
-  }, [config, guests, hostPersonaId]);
+  }, [config, guests, hostPersonaId, scriptText]);
 
   // Handle Keyboard Shortcuts
   useEffect(() => {
@@ -203,17 +205,24 @@ export function AIInterface() {
         
         let existingGuest = guestsRef.current.find(g => g.audioId === speakerId);
         if (!existingGuest) {
-          const newGuest = {
-            id: crypto.randomUUID(),
-            name: `Guest (Voice ${speakerId})`,
-            role: 'Guest Speaker',
-            color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
-            avatar: '👤',
-            bio: '',
-            audioId: speakerId
-          };
-          setGuests(prev => [...prev, newGuest]);
-          setActiveGuestId(newGuest.id);
+          const unmapped = guestsRef.current.find(g => g.audioId === undefined && g.role !== 'Audience');
+          if (unmapped) {
+            setGuests(prev => prev.map(g => g.id === unmapped.id ? { ...g, audioId: speakerId } : g));
+          } else {
+            // All official guests have spoken. This is a new voice, so it must be an audience member!
+            const newGuest = {
+              id: crypto.randomUUID(),
+              name: `Audience (Mic ${speakerId})`,
+              role: 'Audience',
+              color: '#94a3b8',
+              avatar: '🙋',
+              bio: '',
+              audioId: speakerId,
+              isActive: true
+            };
+            setGuests(prev => [...prev, newGuest]);
+            setActiveGuestId(newGuest.id);
+          }
         } else if (activeGuestIdRef.current !== existingGuest.id) {
           setActiveGuestId(existingGuest.id);
         }
@@ -404,6 +413,8 @@ export function AIInterface() {
           onGuestsChange={setGuests}
           hostPersonaId={hostPersonaId}
           onPersonaChange={setHostPersonaId}
+          scriptText={scriptText}
+          onScriptTextChange={setScriptText}
         />
       </div>
     </div>
