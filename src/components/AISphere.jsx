@@ -3,25 +3,15 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-const vertexShader = `
-  uniform float uTime;
-  uniform float uAudioLevel;
-  uniform float uState; // 0=idle, 1=listening, 2=thinking, 3=speaking
-  
-  attribute float aRandom;
-  attribute float aTheta;
-  attribute float aPhi;
-  attribute float aSize;
-  
-  varying float vAlpha;
-  varying vec3 vColor;
-  
-  // Simplex noise
+/* ═══════════════════════════════════════════
+   NOISE (shared by both shaders)
+   ═══════════════════════════════════════════ */
+const noiseGLSL = `
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
   float snoise(vec3 v) {
-    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+    const vec2 C = vec2(1.0/6.0, 1.0/3.0);
     const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
     vec3 i = floor(v + dot(v, C.yyy));
     vec3 x0 = v - i + dot(i, C.xxx);
@@ -56,194 +46,368 @@ const vertexShader = `
     vec3 p1 = vec3(a0.zw, h.y);
     vec3 p2 = vec3(a1.xy, h.z);
     vec3 p3 = vec3(a1.zw, h.w);
-    vec4 norm = 1.79284291400159 - 0.85373472095314 * vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3));
+    vec4 norm = 1.79284291400159 - 0.85373472095314 *
+      vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3));
     p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+    vec4 m = max(0.6 - vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)), 0.0);
     m = m * m;
-    return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+    return 42.0 * dot(m*m, vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
   }
-  
+`;
+
+/* ═══════════════════════════════════════════
+   1. PARTICLE DUST SHELL  (the blue cloud)
+   ═══════════════════════════════════════════ */
+const dustVertexShader = `
+  uniform float uTime;
+  uniform float uAudioLevel;
+  uniform float uState;
+
+  attribute float aRandom;
+  attribute float aTheta;
+  attribute float aPhi;
+
+  varying float vAlpha;
+  varying vec3  vColor;
+
+  ${noiseGLSL}
+
   void main() {
     float radius = 2.0;
-    
-    float breathSpeed = 0.5;
-    float noiseScale = 0.8;
-    float noiseAmp = 0.2;
-    float rotSpeed = 0.05;
+    float time   = uTime * 0.4;
+
+    // state dynamics — more aggressive motion
+    float noiseAmp  = 0.20;
+    float rotSpeed  = 0.08;
     float expansion = 0.0;
-    
+
     if (uState < 0.5) {
-      // Idle
-      breathSpeed = 0.3;
-      noiseAmp = 0.15;
+      noiseAmp = 0.20;
+      rotSpeed = 0.08;
     } else if (uState < 1.5) {
-      // Listening
-      breathSpeed = 0.8;
-      noiseAmp = 0.25 + uAudioLevel * 0.3;
-      expansion = uAudioLevel * 0.2;
-    } else if (uState < 2.5) {
-      // Thinking
-      breathSpeed = 1.5;
-      noiseAmp = 0.4;
-      noiseScale = 1.5;
-      rotSpeed = 0.2;
-    } else {
-      // Speaking
-      breathSpeed = 1.0;
-      noiseAmp = 0.2 + uAudioLevel * 0.2;
+      noiseAmp  = 0.25 + uAudioLevel * 0.25;
+      rotSpeed  = 0.12;
       expansion = uAudioLevel * 0.15;
+    } else if (uState < 2.5) {
+      noiseAmp = 0.35;
+      rotSpeed = 0.25;
+    } else {
+      noiseAmp  = 0.22 + uAudioLevel * 0.2;
+      rotSpeed  = 0.14;
+      expansion = uAudioLevel * 0.12;
     }
-    
-    float time = uTime * 0.5;
-    
-    // Base position on sphere
-    float theta = aTheta + time * rotSpeed * (0.5 + aRandom);
-    float phi = aPhi + time * rotSpeed * 0.2 * (aRandom - 0.5);
-    
+
+    // each particle drifts at its own speed (non-uniform motion)
+    float theta = aTheta + time * rotSpeed * (0.3 + aRandom * 0.7);
+    float phi   = aPhi   + sin(time * 0.3 + aRandom * 6.28) * 0.02;
+
     vec3 pos;
     pos.x = radius * sin(phi) * cos(theta);
     pos.y = radius * cos(phi);
     pos.z = radius * sin(phi) * sin(theta);
-    
-    // Breathing
-    float breath = sin(time * breathSpeed) * 0.05;
-    pos *= (1.0 + breath + expansion);
-    
-    // Surface distortion
-    vec3 normal = normalize(pos);
-    float noiseVal = snoise(pos * noiseScale + time);
-    
-    // Create wave bands (like the reference image)
-    float wave = sin(pos.y * 5.0 + time * 2.0) * cos(pos.x * 4.0 - time);
-    float distortion = (noiseVal + wave * 0.3) * noiseAmp;
-    
-    pos += normal * distortion;
-    
-    // Inner core streams (thinking state)
-    if (uState > 1.5 && uState < 2.5 && aRandom > 0.8) {
-       pos *= 0.7 + noiseVal * 0.4; 
+
+    // breathing — more pronounced
+    pos *= 1.0 + sin(time * 0.8) * 0.04 + expansion;
+
+    // organic noise displacement — large-scale + small-scale
+    vec3 n = normalize(pos);
+    float noise1 = snoise(pos * 0.7 + time * 1.0);
+    float noise2 = snoise(pos * 1.8 - time * 0.5);
+    float distort = (noise1 * 0.8 + noise2 * 0.2) * noiseAmp;
+    pos += n * distort;
+
+    // ~3% of particles escape slightly off the surface
+    if (aRandom > 0.97) {
+      pos += n * abs(snoise(vec3(aTheta * 2.0, aPhi * 2.0, time * 0.5))) * 0.35;
     }
-    
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
-    
-    // Size attenuation
-    gl_PointSize = aSize * (300.0 / -mvPosition.z);
-    
-    // Colors mimicking the reference image
-    vec3 colorBlue = vec3(0.04, 0.27, 1.0);  // Deep electric blue
-    vec3 colorCyan = vec3(0.0, 0.9, 1.0);    // Bright cyan
-    vec3 colorPurple = vec3(0.6, 0.2, 1.0);  // Violet/Purple
-    
-    float mixVal = smoothstep(-0.5, 0.5, noiseVal + wave * 0.5);
-    vec3 baseColor = mix(colorBlue, colorCyan, mixVal * 0.6);
-    
-    // Add purple accents to some particles
-    if (aRandom > 0.7) {
-      baseColor = mix(baseColor, colorPurple, (aRandom - 0.7) * 3.3);
-    }
-    
-    // Intensity based on state and audio
+
+    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mv;
+
+    // slightly bigger particles
+    gl_PointSize = (1.5 + aRandom * 2.0) * (1.0 / (-mv.z * 0.15));
+    gl_PointSize = clamp(gl_PointSize, 1.2, 4.5);
+
+    // neon blue only — no other colours
+    vec3 colDeep = vec3(0.02, 0.15, 0.95);
+    vec3 colNeon = vec3(0.1, 0.5, 1.0);
+    float blend  = smoothstep(-0.3, 0.5, noise1);
+    vColor = mix(colDeep, colNeon, blend * 0.55);
+
+    // edge particles glow brighter (rim light effect)
+    float rim = 1.0 - abs(dot(n, vec3(0.0, 0.0, 1.0)));
+    vColor += vec3(0.05, 0.25, 0.5) * rim * rim;
+
     float intensity = 1.0;
-    if (uState > 0.5 && uState < 1.5) intensity += uAudioLevel * 0.8;
-    if (uState > 2.5) intensity += uAudioLevel * 0.5;
-    
-    vColor = baseColor * intensity;
-    
-    // Transparency
-    vAlpha = 0.4 + aRandom * 0.4;
-    if (uState > 1.5 && uState < 2.5) vAlpha += 0.2; // Thinking is brighter
+    if (uState > 0.5 && uState < 1.5) intensity += uAudioLevel * 0.5;
+    if (uState > 2.5) intensity += uAudioLevel * 0.4;
+    vColor *= intensity;
+
+    vAlpha = 0.5 + aRandom * 0.35;
   }
 `;
 
-const fragmentShader = `
+const dustFragmentShader = `
   varying float vAlpha;
-  varying vec3 vColor;
-  
+  varying vec3  vColor;
   void main() {
-    float dist = length(gl_PointCoord - vec2(0.5));
-    if (dist > 0.5) discard;
-    
-    // Soft particle dot
-    float alpha = smoothstep(0.5, 0.1, dist) * vAlpha;
-    gl_FragColor = vec4(vColor, alpha);
+    float d = length(gl_PointCoord - vec2(0.5));
+    if (d > 0.5) discard;
+    float a = smoothstep(0.5, 0.1, d) * vAlpha;
+    gl_FragColor = vec4(vColor, a);
   }
 `;
 
-function ParticleSystem({ state, audioLevel }) {
-  const meshRef = useRef();
-  const uniformsRef = useRef({
-    uTime: { value: 0 },
+/* ═══════════════════════════════════════════
+   2. ACCENT TENDRILS  (the pink/salmon streams)
+   ═══════════════════════════════════════════ */
+const tendrilVertexShader = `
+  uniform float uTime;
+  uniform float uAudioLevel;
+  uniform float uState;
+
+  attribute float aTheta;
+  attribute float aPhi;
+  attribute float aFiberRandom;
+  attribute float aProgress;
+
+  varying float vAlpha;
+  varying vec3  vColor;
+
+  ${noiseGLSL}
+
+  void main() {
+    float radius = 2.05; // slightly outside the dust shell
+    float time   = uTime * 0.4;
+
+    float rotSpeed = 0.06;
+    float noiseAmp = 0.15;
+    if (uState > 1.5 && uState < 2.5) {
+      rotSpeed = 0.2;
+      noiseAmp = 0.3;
+    }
+
+    // each tendril flows at its own unique pace
+    float theta = aTheta + time * rotSpeed * (0.4 + aFiberRandom * 0.6);
+    float phi   = aPhi;
+
+    vec3 pos;
+    pos.x = radius * sin(phi) * cos(theta);
+    pos.y = radius * cos(phi);
+    pos.z = radius * sin(phi) * sin(theta);
+
+    // organic surface displacement
+    vec3 n = normalize(pos);
+    float noise = snoise(pos * 0.6 + time * 0.8);
+    pos += n * noise * noiseAmp;
+
+    // breathing sync
+    float expansion = 0.0;
+    if (uState > 0.5 && uState < 1.5) expansion = uAudioLevel * 0.12;
+    if (uState > 2.5) expansion = uAudioLevel * 0.1;
+    pos *= 1.0 + sin(time * 0.5) * 0.025 + expansion;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+    // colour — warm pink/salmon/peach with some variation
+    vec3 colPink   = vec3(0.9, 0.35, 0.45);
+    vec3 colPeach  = vec3(0.95, 0.55, 0.35);
+    vec3 colCyan   = vec3(0.2, 0.8, 1.0);
+    float n2 = snoise(pos * 1.2 - time * 0.3);
+    vec3 baseColor = mix(colPink, colPeach, smoothstep(-0.3, 0.5, n2) * 0.6);
+
+    // a few cyan highlight tendrils
+    if (aFiberRandom > 0.7) {
+      baseColor = mix(baseColor, colCyan, (aFiberRandom - 0.7) * 2.0);
+    }
+
+    vColor = baseColor;
+
+    // taper fiber ends
+    float fade = smoothstep(0.0, 0.05, aProgress) * smoothstep(1.0, 0.95, aProgress);
+    vAlpha = fade * 0.75;
+  }
+`;
+
+const tendrilFragmentShader = `
+  varying float vAlpha;
+  varying vec3  vColor;
+  void main() {
+    gl_FragColor = vec4(vColor, vAlpha);
+  }
+`;
+
+/* ═══════════════════════════════════════════
+   Particle Dust Component
+   ═══════════════════════════════════════════ */
+function DustShell({ state, audioLevel }) {
+  const ref = useRef();
+  const uniforms = useRef({
+    uTime:       { value: 0 },
     uAudioLevel: { value: 0 },
-    uState: { value: 0 },
+    uState:      { value: 0 },
   });
 
-  // Increased particle count for the dense dust look
   const PARTICLE_COUNT = 30000;
-
-  const { positions, randoms, thetas, phis, sizes } = useMemo(() => {
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const randoms = new Float32Array(PARTICLE_COUNT);
-    const thetas = new Float32Array(PARTICLE_COUNT);
-    const phis = new Float32Array(PARTICLE_COUNT);
-    const sizes = new Float32Array(PARTICLE_COUNT);
-
-    const goldenRatio = (1 + Math.sqrt(5)) / 2;
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const theta = 2 * Math.PI * i / goldenRatio;
-      const phi = Math.acos(1 - 2 * (i + 0.5) / PARTICLE_COUNT);
-      
-      const r = 2.0;
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.cos(phi);
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-
-      randoms[i] = Math.random();
-      thetas[i] = theta;
-      phis[i] = phi;
-      
-      // Variable particle sizes, some tiny, some slightly larger
-      sizes[i] = Math.random() < 0.9 ? Math.random() * 1.5 + 0.5 : Math.random() * 3.0 + 1.0;
-    }
-
-    return { positions, randoms, thetas, phis, sizes };
-  }, []);
-
   const stateMap = { idle: 0, listening_guest: 1, thinking: 2, speaking_host: 3 };
 
-  useFrame((_, delta) => {
-    if (!uniformsRef.current) return;
-    uniformsRef.current.uTime.value += delta;
+  const { positions, randoms, thetas, phis } = useMemo(() => {
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const randoms   = new Float32Array(PARTICLE_COUNT);
+    const thetas    = new Float32Array(PARTICLE_COUNT);
+    const phis      = new Float32Array(PARTICLE_COUNT);
+    const golden    = (1 + Math.sqrt(5)) / 2;
+    const R = 2.0;
 
-    const targetAudio = audioLevel || 0;
-    const targetState = stateMap[state] ?? 0;
-    uniformsRef.current.uAudioLevel.value += (targetAudio - uniformsRef.current.uAudioLevel.value) * 0.15;
-    uniformsRef.current.uState.value += (targetState - uniformsRef.current.uState.value) * 0.05;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const theta = 2 * Math.PI * i / golden;
+      const phi   = Math.acos(1 - 2 * (i + 0.5) / PARTICLE_COUNT);
+      positions[i*3]   = R * Math.sin(phi) * Math.cos(theta);
+      positions[i*3+1] = R * Math.cos(phi);
+      positions[i*3+2] = R * Math.sin(phi) * Math.sin(theta);
+      randoms[i] = Math.random();
+      thetas[i]  = theta;
+      phis[i]    = phi;
+    }
+    return { positions, randoms, thetas, phis };
+  }, []);
+
+  useFrame((_, dt) => {
+    if (!uniforms.current) return;
+    uniforms.current.uTime.value += dt;
+    uniforms.current.uAudioLevel.value += ((audioLevel||0) - uniforms.current.uAudioLevel.value) * 0.15;
+    uniforms.current.uState.value += ((stateMap[state]??0) - uniforms.current.uState.value) * 0.05;
   });
 
   return (
-    <points ref={meshRef}>
+    <points ref={ref}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" count={PARTICLE_COUNT} array={positions} itemSize={3} />
-        <bufferAttribute attach="attributes-aRandom" count={PARTICLE_COUNT} array={randoms} itemSize={1} />
-        <bufferAttribute attach="attributes-aTheta" count={PARTICLE_COUNT} array={thetas} itemSize={1} />
-        <bufferAttribute attach="attributes-aPhi" count={PARTICLE_COUNT} array={phis} itemSize={1} />
-        <bufferAttribute attach="attributes-aSize" count={PARTICLE_COUNT} array={sizes} itemSize={1} />
+        <bufferAttribute attach="attributes-aRandom"  count={PARTICLE_COUNT} array={randoms}   itemSize={1} />
+        <bufferAttribute attach="attributes-aTheta"    count={PARTICLE_COUNT} array={thetas}    itemSize={1} />
+        <bufferAttribute attach="attributes-aPhi"      count={PARTICLE_COUNT} array={phis}      itemSize={1} />
       </bufferGeometry>
       <shaderMaterial
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniformsRef.current}
-        transparent
-        depthWrite={false}
+        vertexShader={dustVertexShader}
+        fragmentShader={dustFragmentShader}
+        uniforms={uniforms.current}
+        transparent depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
     </points>
   );
 }
 
-// Removed the solid AmbientGlow sphere so it looks more like the hollow reference image.
+/* ═══════════════════════════════════════════
+   Accent Tendril Component (only 6 streams)
+   ═══════════════════════════════════════════ */
+function AccentTendrils({ state, audioLevel }) {
+  const ref = useRef();
+  const uniforms = useRef({
+    uTime:       { value: 0 },
+    uAudioLevel: { value: 0 },
+    uState:      { value: 0 },
+  });
+
+  const TENDRIL_COUNT    = 6;
+  const POINTS_PER       = 200;
+  const SEGS             = POINTS_PER - 1;
+  const VERTS_PER        = SEGS * 2;
+  const TOTAL            = TENDRIL_COUNT * VERTS_PER;
+  const stateMap = { idle: 0, listening_guest: 1, thinking: 2, speaking_host: 3 };
+
+  const geometry = useMemo(() => {
+    const pos      = new Float32Array(TOTAL * 3);
+    const aTheta   = new Float32Array(TOTAL);
+    const aPhi     = new Float32Array(TOTAL);
+    const aFibRnd  = new Float32Array(TOTAL);
+    const aProg    = new Float32Array(TOTAL);
+    const R = 2.05;
+
+    for (let f = 0; f < TENDRIL_COUNT; f++) {
+      const fRand = Math.random();
+      let theta = Math.random() * Math.PI * 2;
+      let phi   = Math.acos(1 - 2 * Math.random());
+
+      const pts = [];
+      for (let p = 0; p < POINTS_PER; p++) {
+        pts.push({ theta, phi });
+        // long, sweeping curves that wrap far around the sphere
+        theta += 0.035 + Math.sin(p * 0.04 + fRand * 12.0) * 0.015;
+        phi   += Math.sin(p * 0.06 + fRand * 18.0) * 0.025;
+        phi    = Math.max(0.15, Math.min(Math.PI - 0.15, phi));
+      }
+
+      for (let s = 0; s < SEGS; s++) {
+        const b = f * VERTS_PER + s * 2;
+        const p1 = pts[s], p2 = pts[s+1];
+
+        aTheta[b]   = p1.theta; aPhi[b]   = p1.phi;
+        aTheta[b+1] = p2.theta; aPhi[b+1] = p2.phi;
+        aFibRnd[b]  = fRand;    aFibRnd[b+1] = fRand;
+        aProg[b]    = s/SEGS;   aProg[b+1]   = (s+1)/SEGS;
+
+        pos[b*3]     = R*Math.sin(p1.phi)*Math.cos(p1.theta);
+        pos[b*3+1]   = R*Math.cos(p1.phi);
+        pos[b*3+2]   = R*Math.sin(p1.phi)*Math.sin(p1.theta);
+        pos[(b+1)*3]   = R*Math.sin(p2.phi)*Math.cos(p2.theta);
+        pos[(b+1)*3+1] = R*Math.cos(p2.phi);
+        pos[(b+1)*3+2] = R*Math.sin(p2.phi)*Math.sin(p2.theta);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position',     new THREE.BufferAttribute(pos,    3));
+    geo.setAttribute('aTheta',       new THREE.BufferAttribute(aTheta, 1));
+    geo.setAttribute('aPhi',         new THREE.BufferAttribute(aPhi,   1));
+    geo.setAttribute('aFiberRandom', new THREE.BufferAttribute(aFibRnd,1));
+    geo.setAttribute('aProgress',    new THREE.BufferAttribute(aProg,  1));
+    return geo;
+  }, []);
+
+  useFrame((_, dt) => {
+    if (!uniforms.current) return;
+    uniforms.current.uTime.value += dt;
+    uniforms.current.uAudioLevel.value += ((audioLevel||0) - uniforms.current.uAudioLevel.value) * 0.15;
+    uniforms.current.uState.value += ((stateMap[state]??0) - uniforms.current.uState.value) * 0.05;
+  });
+
+  return (
+    <lineSegments ref={ref} geometry={geometry}>
+      <shaderMaterial
+        vertexShader={tendrilVertexShader}
+        fragmentShader={tendrilFragmentShader}
+        uniforms={uniforms.current}
+        transparent depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </lineSegments>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Soft outer glow ring
+   ═══════════════════════════════════════════ */
+function OuterGlow() {
+  const ref = useRef();
+  useFrame((_, dt) => { if (ref.current) ref.current.rotation.z += dt * 0.06; });
+  return (
+    <mesh ref={ref}>
+      <ringGeometry args={[2.2, 3.0, 64]} />
+      <meshBasicMaterial
+        color={new THREE.Color(0.04, 0.1, 0.85)}
+        transparent opacity={0.05}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Exported Component
+   ═══════════════════════════════════════════ */
 export function AISphere({ state = 'idle', audioLevel = 0 }) {
   return (
     <div className="sphere-canvas-wrap">
@@ -253,7 +417,7 @@ export function AISphere({ state = 'idle', audioLevel = 0 }) {
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
       >
-        <ParticleSystem state={state} audioLevel={audioLevel} />
+        <DustShell state={state} audioLevel={audioLevel} />
         <OrbitControls
           enableZoom={false}
           enablePan={false}

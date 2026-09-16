@@ -54,11 +54,13 @@ export function SettingsModal({
   // Form state for new guest
   const [newGuestName, setNewGuestName] = useState('');
   const [newGuestRole, setNewGuestRole] = useState('');
+  const [newGuestGender, setNewGuestGender] = useState('female');
 
   // Editing guest
   const [editingGuestId, setEditingGuestId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
+  const [editGender, setEditGender] = useState('female');
 
   // Local config copy for editing
   const [localConfig, setLocalConfig] = useState(config);
@@ -92,6 +94,7 @@ export function SettingsModal({
       id: crypto.randomUUID(),
       name: newGuestName.trim(),
       role: newGuestRole.trim() || 'Guest Speaker',
+      gender: newGuestGender,
       color: getNextColor(guests.length),
       avatar: getNextAvatar(guests.length),
       isActive: guests.length === 0 // first guest is active by default
@@ -100,6 +103,7 @@ export function SettingsModal({
     onGuestsChange([...guests, newGuest]);
     setNewGuestName('');
     setNewGuestRole('');
+    setNewGuestGender('female');
   };
 
   const handleRemoveGuest = (guestId) => {
@@ -115,12 +119,13 @@ export function SettingsModal({
     setEditingGuestId(guest.id);
     setEditName(guest.name);
     setEditRole(guest.role);
+    setEditGender(guest.gender || 'female');
   };
 
   const handleSaveEdit = (guestId) => {
     const updated = guests.map(g =>
       g.id === guestId
-        ? { ...g, name: editName.trim() || g.name, role: editRole.trim() || g.role }
+        ? { ...g, name: editName.trim() || g.name, role: editRole.trim() || g.role, gender: editGender }
         : g
     );
     onGuestsChange(updated);
@@ -249,7 +254,7 @@ export function SettingsModal({
               <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Plus size={16} /> Add New Guest
               </h4>
-              <div className="form-row">
+              <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr 100px' }}>
                 <div className="form-group">
                   <label className="form-label">Guest Name</label>
                   <input
@@ -269,6 +274,18 @@ export function SettingsModal({
                     placeholder="VP of AI Research"
                     onKeyDown={e => { if (e.key === 'Enter') handleAddGuest(); }}
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Gender</label>
+                  <select
+                    className="form-input"
+                    value={newGuestGender}
+                    onChange={e => setNewGuestGender(e.target.value)}
+                    style={{ padding: '9px' }}
+                  >
+                    <option value="female" style={{ color: 'black' }}>Female</option>
+                    <option value="male" style={{ color: 'black' }}>Male</option>
+                  </select>
                 </div>
               </div>
               <button
@@ -315,7 +332,7 @@ export function SettingsModal({
                         className="form-input"
                         value={editName}
                         onChange={e => setEditName(e.target.value)}
-                        style={{ padding: '4px 8px', fontSize: '0.82rem' }}
+                        style={{ padding: '4px 8px', fontSize: '0.82rem', flex: 1 }}
                         autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(guest.id); }}
                       />
@@ -323,9 +340,18 @@ export function SettingsModal({
                         className="form-input"
                         value={editRole}
                         onChange={e => setEditRole(e.target.value)}
-                        style={{ padding: '4px 8px', fontSize: '0.82rem' }}
+                        style={{ padding: '4px 8px', fontSize: '0.82rem', flex: 1 }}
                         onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(guest.id); }}
                       />
+                      <select
+                        className="form-input"
+                        value={editGender}
+                        onChange={e => setEditGender(e.target.value)}
+                        style={{ padding: '4px 8px', fontSize: '0.82rem', width: '85px' }}
+                      >
+                        <option value="female" style={{ color: 'black' }}>Female</option>
+                        <option value="male" style={{ color: 'black' }}>Male</option>
+                      </select>
                     </div>
                   ) : (
                     <>
@@ -402,6 +428,31 @@ export function SettingsModal({
               <p className="form-hint" style={{ marginBottom: '10px' }}>
                 JOY is currently set to use the ⚡ Groq API (Fast, Free Tier).
               </p>
+            </div>
+
+            {/* TTS Voice Selector */}
+            <div className="form-group animate-fade-in" style={{ marginBottom: '16px' }}>
+              <label className="form-label">JOY's Voice (Deepgram Aura)</label>
+              <select
+                className="form-input"
+                value={localConfig.ttsVoice || 'aura-asteria-en'}
+                onChange={e => updateLocalConfig('ttsVoice', e.target.value)}
+              >
+                <optgroup label="Female Voices">
+                  <option value="aura-asteria-en" style={{ color: 'black' }}>Asteria (Natural, Professional)</option>
+                  <option value="aura-luna-en" style={{ color: 'black' }}>Luna (Soft, Friendly)</option>
+                  <option value="aura-stella-en" style={{ color: 'black' }}>Stella (Bright, Enthusiastic)</option>
+                  <option value="aura-athena-en" style={{ color: 'black' }}>Athena (Calm, Authoritative)</option>
+                  <option value="aura-hera-en" style={{ color: 'black' }}>Hera (Warm, Maternal)</option>
+                </optgroup>
+                <optgroup label="Male Voices">
+                  <option value="aura-orion-en" style={{ color: 'black' }}>Orion (Deep, Resonant)</option>
+                  <option value="aura-arcas-en" style={{ color: 'black' }}>Arcas (Energetic, Clear)</option>
+                  <option value="aura-perseus-en" style={{ color: 'black' }}>Perseus (Smooth, Articulate)</option>
+                  <option value="aura-angus-en" style={{ color: 'black' }}>Angus (Casual, Conversational)</option>
+                  <option value="aura-orpheus-en" style={{ color: 'black' }}>Orpheus (Rich, Warm)</option>
+                </optgroup>
+              </select>
             </div>
 
             {/* Groq API Key */}

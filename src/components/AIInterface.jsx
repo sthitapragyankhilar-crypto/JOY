@@ -34,6 +34,8 @@ export function AIInterface() {
   const deepgramSpeakerRef = useRef(0);
   const guestsRef = useRef(DEFAULT_GUESTS);
   const activeGuestIdRef = useRef(DEFAULT_GUESTS[0].id);
+  const configRef = useRef(null);
+  const hostPersonaIdRef = useRef('alex');
 
   // Interface State
   const [stageStatus, setStageStatus] = useState('idle'); // idle, listening_guest, thinking, speaking_host
@@ -63,7 +65,8 @@ export function AIInterface() {
     groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
     deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
-    ollamaUrl: 'http://localhost:11434'
+    ollamaUrl: 'http://localhost:11434',
+    ttsVoice: 'aura-asteria-en'
   });
 
   const activeGuest = guests.find(g => g.id === activeGuestId) || guests[0];
@@ -72,7 +75,9 @@ export function AIInterface() {
   useEffect(() => {
     guestsRef.current = guests;
     activeGuestIdRef.current = activeGuestId;
-  }, [guests, activeGuestId]);
+    configRef.current = config;
+    hostPersonaIdRef.current = hostPersonaId;
+  }, [guests, activeGuestId, config, hostPersonaId]);
 
   // Initialize
   useEffect(() => {
@@ -174,8 +179,9 @@ export function AIInterface() {
 
       setStageStatus('speaking_host');
       audioRef.current.speakText(response.spokenResponse, {
-        pitch: hostPersona.pitch,
-        rate: hostPersona.rate,
+        pitch: HOST_PERSONAS[hostPersonaIdRef.current]?.pitch || 1.0,
+        rate: HOST_PERSONAS[hostPersonaIdRef.current]?.rate || 1.0,
+        ttsVoice: configRef.current?.ttsVoice || 'aura-asteria-en',
         onStart: () => audioRef.current.startMicVisualizer(), // reuse mic for output viz if needed
         onEnd: () => {
           if (isContinuousModeRef.current) {
@@ -296,8 +302,9 @@ export function AIInterface() {
 
       setStageStatus('speaking_host');
       audioRef.current.speakText(response.spokenResponse, {
-        pitch: hostPersona.pitch,
-        rate: hostPersona.rate,
+        pitch: HOST_PERSONAS[hostPersonaIdRef.current]?.pitch || 1.0,
+        rate: HOST_PERSONAS[hostPersonaIdRef.current]?.rate || 1.0,
+        ttsVoice: configRef.current?.ttsVoice || 'aura-asteria-en',
         onEnd: () => {
           if (isContinuousModeRef.current) {
             handleStartListening();

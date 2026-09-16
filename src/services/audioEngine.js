@@ -129,37 +129,31 @@ export class AudioEngine {
    * @param {string} text - Text to speak
    * @param {object} options - { pitch, rate, onStart, onEnd, onError }
    */
-  async speakText(text, { pitch = 1.0, rate = 1.0, onStart, onEnd, onError } = {}) {
+  async speakText(text, { pitch = 1.0, rate = 1.0, ttsVoice = 'aura-asteria-en', onStart, onEnd, onError } = {}) {
     if (!this.deepgramApiKey) {
-      if (onError) onError("Deepgram API Key is missing for TTS.");
+      if (onError) onError("Deepgram API Key is missing. TTS disabled.");
       return;
     }
 
-    this.stopSpeaking();
+    if (this.isSpeaking) {
+       this.stopSpeaking();
+    }
 
-    // Clean text of markdown/tags if any remain
-    let cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[*_#]/g, "").trim();
-
-    // Normalization for Deepgram Aura TTS quirks with abbreviations
-    cleanText = cleanText
-      .replace(/\bDr\./g, "Doctor")
-      .replace(/\bPh\.?D\.?/gi, "P H D")
-      .replace(/\bProf\./g, "Professor");
-
+    // Basic SSML/text cleanup if needed (Deepgram mostly just takes plain text)
+    const cleanText = text.replace(/[\*\_]/g, '').trim();
     if (!cleanText) {
        console.warn("TTS: No text to speak after cleaning.");
        if (onEnd) onEnd();
        return;
     }
 
-    console.log("TTS: Requesting Deepgram Aura for:", cleanText.substring(0, 50) + "...");
+    console.log(`TTS: Requesting Deepgram Aura (${ttsVoice}) for:`, cleanText.substring(0, 50) + "...");
 
     try {
       this.isSpeaking = true;
       if (onStart) onStart();
 
-      // Deepgram Aura Asteria (female, natural)
-      const response = await fetch("https://api.deepgram.com/v1/speak?model=aura-asteria-en", {
+      const response = await fetch(`https://api.deepgram.com/v1/speak?model=${ttsVoice}`, {
         method: "POST",
         headers: {
           "Authorization": `Token ${this.deepgramApiKey}`,
