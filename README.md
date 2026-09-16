@@ -1,39 +1,38 @@
 # 🎙️ JOY - RAG-Powered AI Podcaster Voice Agent
 
-An end-to-end, 100% free and open-source **AI Voice Agent** engineered specifically to interview resource persons, keynote speakers, and conference guests like a seasoned podcast host.
+An end-to-end **AI Voice Agent** engineered specifically to interview resource persons, keynote speakers, and conference guests like a seasoned podcast host.
 
-The agent features **Retrieval-Augmented Generation (RAG)** for factual grounding on guest documents, **real-time logical reasoning**, **chain-of-thought analysis**, **dynamic follow-up question generation**, and **neural speech synthesis**.
+The agent features **Retrieval-Augmented Generation (RAG)** for factual grounding on guest documents, **real-time logical reasoning**, **chain-of-thought analysis**, **dynamic follow-up question generation**, and **high-fidelity neural speech synthesis**.
 
 ---
 
 ## 🌟 Key Features
 
-1. **End-to-End Voice Interaction**: Speech input from conference guests and hyper-realistic Text-to-Speech host output.
+1. **End-to-End Voice Interaction**: Ultra-low latency Speech-to-Text (STT) and hyper-realistic Text-to-Speech (TTS) using **Deepgram Aura**.
 2. **Logical Reasoning & Chain-of-Thought**: Before speaking, the AI host executes explicit internal reasoning (`<think>` steps) to analyze the guest's points, evaluate trade-offs, check the agenda, and formulate sharp follow-ups.
-3. **RAG-Powered Knowledge Base**: Upload guest documents and publications with **per-guest document tagging**. The agent uses in-memory semantic search to ground its questions in the guest's actual work.
+3. **In-Browser RAG Knowledge Base**: Upload guest documents and publications with **per-guest document tagging**. The agent uses semantic token search to ground its questions in the guest's actual work entirely in the browser.
 4. **Multi-Guest & Multi-Persona Support**: Track multiple guests and active speakers in real-time. Switch between diverse AI Host personas (Alex, Elena, Marcus) with unique interviewing styles.
-5. **Immersive 3D Visualizer**: Features a stunning, interactive 3D particle and waveform visualizer built with Three.js and Framer Motion.
-6. **Continuous Learning Buffer**: Automatically tracks podcast history and spoken turns.
-7. **Flexible LLM Backends**: Operates using local open-source models (Ollama) or fast cloud inference APIs (Groq).
+5. **Immersive 3D Visualizer**: Features a stunning, interactive 3D particle and waveform visualizer built with modern web technologies.
+6. **Flexible LLM Backends**: Operates using local open-source models (Ollama) or fast cloud inference APIs (Groq).
 
 ---
 
 ## 📐 System Architecture
 
-```
+```text
                        🎙️ GUEST VOICE INPUT (Microphone)
                                       │
                                       ▼
              ┌─────────────────────────────────────────────────┐
              │       Speech-to-Text (STT) Processing           │
-             │   - Web Speech API (Browser Native Zero-Cost)   │
-             │   - OR Faster-Whisper (Local Python Backend)    │
+             │   - Deepgram WebSocket Streaming API            │
+             │   - Real-time transcription & diarization       │
              └────────────────────────┬────────────────────────┘
                                       │ Transcribed Text
                                       ▼
              ┌─────────────────────────────────────────────────┐
              │          Context Memory & RAG Indexer           │
-             │   - TF-IDF Semantic Search over Guest Docs      │
+             │   - In-Memory Semantic Search over Guest Docs   │
              │   - Podcast History / Continuous Buffer         │
              └────────────────────────┬────────────────────────┘
                                       │ Context & History
@@ -44,14 +43,14 @@ The agent features **Retrieval-Augmented Generation (RAG)** for factual groundin
              │  1. Analyze intent and synthesize RAG context   │
              │  2. Formulate podcast response & follow-ups     │
              │                                                 │
-             │  Engines: Ollama (Llama3.2/DeepSeek-R1)         │
-             │           Groq API (Qwen3.6-27b)                │
+             │  Engines: Ollama (Llama3.2/DeepSeek)            │
+             │           Groq API (Fast Cloud Inference)       │
              └────────────────────────┬────────────────────────┘
                                       │ Host Response Text
                                       ▼
              ┌─────────────────────────────────────────────────┐
              │         Text-to-Speech (TTS) Engine             │
-             │   - Edge-TTS (Microsoft Neural Voice Backend)   │
+             │   - Deepgram Aura TTS (Ultra-low latency)       │
              └────────────────────────┬────────────────────────┘
                                       │
                                       ▼
@@ -62,64 +61,40 @@ The agent features **Retrieval-Augmented Generation (RAG)** for factual groundin
 
 ## 🛠️ Tools & Technologies Used
 
-| Layer | Tool / Technology | License / Cost | Why Selected? |
-| :--- | :--- | :--- | :--- |
-| **Frontend UI** | React + Vite + Custom CSS | MIT (Free) | High-performance, low-latency UI. |
-| **3D & Animation** | Three.js (`@react-three/fiber`) + Framer Motion | MIT (Free) | Immersive glassmorphism and real-time particle audio visualizers. |
-| **Backend API** | Python FastAPI + Asyncio | MIT (Free) | Asynchronous backend orchestration for RAG, reasoning, and TTS generation. |
-| **RAG System** | In-Memory TF-IDF Vector Search | Free | Fast, zero-dependency semantic search for guest knowledge chunks. |
-| **LLM Engine** | Ollama (`llama3.2` / `deepseek-r1:8b`) / Groq API (`qwen/qwen3.6-27b`) | Open Weight / Free / API | Enables structured reasoning loops and rich podcast host roleplay with multi-persona support. |
-| **TTS Engine** | Edge-TTS (Microsoft Neural) | Free | Free neural voice synthesis producing natural intonations suitable for broadcast podcasting. |
+| Layer | Tool / Technology | Why Selected? |
+| :--- | :--- | :--- |
+| **Frontend UI** | React + Vite + Custom CSS | High-performance, responsive UI with beautiful glassmorphism. |
+| **3D & Animation** | CSS/SVG Animations + React | Immersive, real-time particle audio visualizers without heavy WebGL overhead. |
+| **Speech-to-Text** | Deepgram WebSocket API | Real-time streaming transcription with speaker diarization. |
+| **Text-to-Speech** | Deepgram Aura API | Lightning-fast, hyper-realistic voice synthesis. |
+| **RAG System** | In-Browser Token Search | Fast, zero-dependency semantic search for guest knowledge chunks directly on the client. |
+| **LLM Engine** | Ollama / Groq API | Enables structured reasoning loops and rich podcast host roleplay with multi-persona support. |
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### 1. Local Python Backend with Ollama or Groq
+### Web Podcast Studio (Frontend)
 
-1. **Environment Setup (Optional for Groq/ngrok)**:
-   Create a `.env` file in the root directory to store your API keys if you plan to use Groq or ngrok:
+1. **Environment Setup**:
+   Create a `.env` file in the root directory to store your API keys:
    ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   NGROK_AUTH_TOKEN=your_ngrok_auth_token_here
+   VITE_GROQ_API_KEY=your_groq_api_key_here
+   VITE_DEEPGRAM_API_KEY=your_deepgram_api_key_here
    ```
 
-2. **Install Ollama (Optional for local inference)**:
-   Download Ollama from [ollama.com](https://ollama.com) and pull a reasoning model:
-   ```bash
-   ollama pull llama3.2
-   # or for DeepSeek reasoning:
-   ollama pull deepseek-r1:8b
-   ```
-
-3. **Set up Python Virtual Environment**:
-   ```bash
-   cd backend
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-4. **Start FastAPI Backend**:
-   ```bash
-   python main.py
-   ```
-   The backend server will run on `http://localhost:8000`.
-
-### 2. Web Podcast Studio (Frontend)
-
-1. **Install Dependencies**:
-   Open a new terminal window:
+2. **Install Dependencies**:
+   Open a terminal in the project root:
    ```bash
    npm install
    ```
 
-2. **Launch Studio UI**:
+3. **Launch Studio UI**:
    ```bash
    npm run dev
    ```
-3. Open `http://localhost:5173` in Google Chrome or Microsoft Edge.
-4. Configure the studio settings to use the Local backend (`http://localhost:8000`), upload knowledge documents, and start the podcast!
+4. Open `http://localhost:3000` (or the port specified by Vite) in your browser.
+5. Open the settings panel (gear icon) to configure your models, set up your guest bios, and adjust the host persona!
 
 ---
 
@@ -128,14 +103,14 @@ The agent features **Retrieval-Augmented Generation (RAG)** for factual groundin
 The core intelligence of the podcaster host lies in enforcing a **Thinking Step** before generating the spoken response. Here is the system prompt blueprint used by the agent (JOY):
 
 ```text
-You are JOY, an intelligent, RAG-powered AI podcast interviewer hosting a technology conference session.
-Your goal is to conduct an articulate, context-aware interview with the guest.
+You are JOY, an intelligent AI podcast host at Tech AI Summit 2026.
+Main Topic: Scalable Autonomous Reasoning Agents
 
 REASONING INSTRUCTIONS:
-Before writing your verbal response, write a <think>...</think> block:
-1. Intent Analysis: Determine if the guest asked a mic/status check ('can you hear me?'), a short query, or gave a technical answer.
-2. Synthesize RAG Context: Incorporate any retrieved facts about the guest's uploaded publications/bio.
-3. Formulate Podcast Response: Respond directly to what they said, then ask a context-rich follow-up question.
+Before writing your verbal response, you MUST think logically inside <think>...</think> tags:
+1. Identify who just spoke.
+2. Note which script questions have already been asked.
+3. Formulate a contextual, brief, conversational follow-up based on the RAG context.
 
 FORMAT REQUIRED:
 <think>
@@ -144,23 +119,4 @@ FORMAT REQUIRED:
 [JOY's spoken podcast response]
 ```
 
-This format ensures that the AI host never gives generic "IA assistant" replies, but instead acts like a professional interviewer actively analyzing the guest's insights using retrieved RAG facts!
-
----
-
-## 🤝 For Collaborators
-
-If you want to contribute to this project or run the code on your own machine without setting up the heavy Python backend, you can connect your local frontend directly to the hosted Render backend!
-
-1. **Fork and Clone** this repository.
-2. **Rename `.env.example` to `.env`** and add your own Groq API key.
-3. **Point to the Hosted Backend**: Inside your new `.env` file, add the following line with the live Render URL:
-   ```env
-   VITE_BACKEND_URL=https://your-joy-backend.onrender.com
-   ```
-4. **Run the UI**: 
-   ```bash
-   npm install
-   npm run dev
-   ```
-Now, any code changes you make to the React UI on your local machine will automatically communicate with the live Render AI backend over the internet!
+This ensures the AI host avoids generic replies and instead acts like a professional interviewer, actively analyzing the guest's insights!

@@ -1,5 +1,6 @@
 import React from 'react';
 import { PersonaBadge } from './PersonaBadge';
+import { Logo } from './Logo';
 
 /**
  * TopBar — Ultra-thin transparent top bar.
@@ -14,13 +15,13 @@ export function TopBar({ hostPersonaId, stageStatus, isListening }) {
     <div className="top-bar">
       <div className="top-bar__left">
         <div className="top-bar__logo">
-          <div className="top-bar__logo-orb" />
+          <Logo width={24} height={24} className="top-bar__logo-svg" />
           <span>JOY</span>
         </div>
       </div>
 
       <div className="top-bar__center">
-        <PersonaBadge personaId={hostPersonaId} />
+        {/* Mode badge removed as requested */}
       </div>
 
       <div className="top-bar__right">

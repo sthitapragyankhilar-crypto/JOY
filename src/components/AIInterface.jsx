@@ -344,7 +344,6 @@ export function AIInterface() {
 
           <div className="sphere-label">
             <div className="sphere-label__name">JOY</div>
-            <div className="sphere-label__mode">{hostPersona.style}</div>
 
             <div className={`sphere-label__status sphere-label__status--${stageStatus === 'listening_guest' ? 'listening' :
               stageStatus === 'thinking' ? 'thinking' :
