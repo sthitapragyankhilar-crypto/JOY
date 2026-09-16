@@ -993,7 +993,7 @@ dialog.settings-modal::backdrop {
 }
 
 .guest-list-info { flex: 1; min-width: 0; }
-.guest-list-name { font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guest-list-name { font-size: 0.82rem; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guest-list-role { font-size: 0.72rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guest-list-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
