@@ -54,7 +54,6 @@ export function SettingsModal({
   // Form state for new guest
   const [newGuestName, setNewGuestName] = useState('');
   const [newGuestRole, setNewGuestRole] = useState('');
-  const [newGuestBio, setNewGuestBio] = useState('');
 
   // Editing guest
   const [editingGuestId, setEditingGuestId] = useState(null);
@@ -95,14 +94,12 @@ export function SettingsModal({
       role: newGuestRole.trim() || 'Guest Speaker',
       color: getNextColor(guests.length),
       avatar: getNextAvatar(guests.length),
-      bio: newGuestBio.trim(),
       isActive: guests.length === 0 // first guest is active by default
     };
 
     onGuestsChange([...guests, newGuest]);
     setNewGuestName('');
     setNewGuestRole('');
-    setNewGuestBio('');
   };
 
   const handleRemoveGuest = (guestId) => {
@@ -273,16 +270,6 @@ export function SettingsModal({
                     onKeyDown={e => { if (e.key === 'Enter') handleAddGuest(); }}
                   />
                 </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Bio / Background (Optional — fed to RAG)</label>
-                <textarea
-                  className="form-input"
-                  value={newGuestBio}
-                  onChange={e => setNewGuestBio(e.target.value)}
-                  placeholder="Paste guest bio, research background, or keynote abstract..."
-                  rows={3}
-                />
               </div>
               <button
                 className="btn-primary"
