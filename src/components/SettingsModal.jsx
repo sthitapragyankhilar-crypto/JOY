@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Settings, X, Radio, Users, Cpu, Plus, Trash2, Edit3, Check
+  Settings, X, Radio, Users, Cpu, Plus, Trash2, Edit3, Check, List
 } from 'lucide-react';
 import { HOST_PERSONAS } from './PersonaBadge';
 
@@ -44,7 +44,9 @@ export function SettingsModal({
   guests,
   onGuestsChange,
   hostPersonaId,
-  onPersonaChange
+  onPersonaChange,
+  script = [],
+  onScriptChange
 }) {
   const dialogRef = useRef(null);
   const [activeTab, setActiveTab] = useState('conference');
@@ -53,6 +55,10 @@ export function SettingsModal({
   const [newGuestName, setNewGuestName] = useState('');
   const [newGuestRole, setNewGuestRole] = useState('');
   const [newGuestBio, setNewGuestBio] = useState('');
+
+  // Form state for new script question
+  const [newQuestionText, setNewQuestionText] = useState('');
+  const [newQuestionTargetId, setNewQuestionTargetId] = useState('');
 
   // Editing guest
   const [editingGuestId, setEditingGuestId] = useState(null);
@@ -140,6 +146,7 @@ export function SettingsModal({
   const tabs = [
     { id: 'conference', label: 'Conference Setup', icon: <Radio size={15} /> },
     { id: 'guests', label: 'Guest Management', icon: <Users size={15} /> },
+    { id: 'script', label: 'Podcast Script', icon: <List size={15} /> },
     { id: 'engine', label: 'Engine & Voice', icon: <Cpu size={15} /> },
   ];
 
@@ -372,6 +379,110 @@ export function SettingsModal({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ---- Podcast Script Tab ---- */}
+        {activeTab === 'script' && (
+          <div className="animate-fade-in">
+            <div style={{
+              padding: '16px',
+              background: 'rgba(99, 102, 241, 0.05)',
+              border: '1px solid rgba(99, 102, 241, 0.15)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '20px'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} /> Add Script Question
+              </h4>
+              <div className="form-group">
+                <label className="form-label">Question</label>
+                <textarea
+                  className="form-input"
+                  value={newQuestionText}
+                  onChange={e => setNewQuestionText(e.target.value)}
+                  placeholder="e.g. Can you explain how attention mechanisms work?"
+                  rows={2}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Target Guest</label>
+                <select 
+                  className="form-input" 
+                  value={newQuestionTargetId}
+                  onChange={e => setNewQuestionTargetId(e.target.value)}
+                  style={{ backgroundColor: 'var(--bg-input)' }}
+                >
+                  <option value="">Select a guest...</option>
+                  {guests.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  if (newQuestionText.trim() && newQuestionTargetId) {
+                    if (onScriptChange) {
+                      onScriptChange([...script, { id: crypto.randomUUID(), text: newQuestionText.trim(), targetGuestId: newQuestionTargetId }]);
+                    }
+                    setNewQuestionText('');
+                    setNewQuestionTargetId('');
+                  }
+                }}
+                disabled={!newQuestionText.trim() || !newQuestionTargetId}
+              >
+                <Plus size={16} /> Add to Script
+              </button>
+            </div>
+
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '10px' }}>
+              CURRENT SCRIPT ({script.length})
+            </h4>
+
+            {script.length === 0 && (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)' }}>
+                No script added. JOY will freestyle!
+              </div>
+            )}
+
+            {script.map((item, idx) => {
+              const target = guests.find(g => g.id === item.targetGuestId);
+              return (
+                <div key={item.id} className="guest-list-item" style={{ alignItems: 'flex-start', padding: '12px' }}>
+                  <div style={{ 
+                    background: 'var(--bg-elevated)', 
+                    color: 'var(--text-muted)', 
+                    width: '24px', 
+                    height: '24px', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    flexShrink: 0
+                  }}>
+                    {idx + 1}
+                  </div>
+                  <div className="guest-list-info" style={{ marginLeft: '12px' }}>
+                    <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{item.text}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                      Target: <span style={{ color: target ? target.color : 'inherit' }}>{target ? target.name : 'Unknown Guest'}</span>
+                    </div>
+                  </div>
+                  <div className="guest-list-actions">
+                    <button
+                      className="btn-icon btn-icon--danger"
+                      onClick={() => onScriptChange(script.filter(s => s.id !== item.id))}
+                      title="Remove question"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

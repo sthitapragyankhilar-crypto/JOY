@@ -57,6 +57,10 @@ export function PodcastStudio() {
   const [knowledgeText, setKnowledgeText] = useState('');
   const [indexedDocs, setIndexedDocs] = useState([]);
 
+  // Script State
+  const [script, setScript] = useState([]);
+  const [currentScriptIndex, setCurrentScriptIndex] = useState(-1);
+
   // Config State
   const [config, setConfig] = useState({
     conferenceName: 'Tech AI Summit 2026',
@@ -116,6 +120,17 @@ export function PodcastStudio() {
       agentRef.current.setHostPersona(hostPersonaId);
     }
   }, [hostPersonaId]);
+
+  // Sync script goal to agent
+  useEffect(() => {
+    if (agentRef.current) {
+      if (currentScriptIndex >= 0 && currentScriptIndex < script.length) {
+        agentRef.current.setScriptGoal(script[currentScriptIndex]);
+      } else {
+        agentRef.current.setScriptGoal(null);
+      }
+    }
+  }, [script, currentScriptIndex]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -581,6 +596,55 @@ export function PodcastStudio() {
         {/* ---- Right Column: Sidebar ---- */}
         <div className="studio-sidebar">
 
+          {/* Script Runner Card */}
+          {script.length > 0 && (
+            <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={18} style={{ color: 'var(--accent-cyan)' }} />
+                  Live Script Flow
+                </div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  {currentScriptIndex >= 0 && currentScriptIndex < script.length ? currentScriptIndex + 1 : '-'}/{script.length}
+                </span>
+              </h3>
+              
+              <div style={{ background: 'var(--bg-surface)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '12px' }}>
+                {currentScriptIndex >= script.length ? (
+                  <div style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '0.85rem' }}>Script completed.</div>
+                ) : currentScriptIndex < 0 ? (
+                  <div style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '0.85rem' }}>Click next to start the script.</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '0.9rem', marginBottom: '8px' }}>{script[currentScriptIndex].text}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-amber)' }}>
+                      Target: {guests.find(g => g.id === script[currentScriptIndex].targetGuestId)?.name || 'Guest'}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  className="btn-secondary" 
+                  style={{ flex: 1 }} 
+                  onClick={() => setCurrentScriptIndex(prev => Math.max(-1, prev - 1))}
+                  disabled={currentScriptIndex < 0}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn-primary" 
+                  style={{ flex: 1 }} 
+                  onClick={() => setCurrentScriptIndex(prev => Math.min(script.length, prev + 1))}
+                  disabled={currentScriptIndex >= script.length}
+                >
+                  Next Question
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* RAG Knowledge Upload Card */}
           <div className="glass-panel" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -661,6 +725,8 @@ export function PodcastStudio() {
         onGuestsChange={handleGuestsChange}
         hostPersonaId={hostPersonaId}
         onPersonaChange={setHostPersonaId}
+        script={script}
+        onScriptChange={setScript}
       />
     </div>
   );

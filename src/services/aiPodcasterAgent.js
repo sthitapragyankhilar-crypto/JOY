@@ -95,6 +95,8 @@ export class AIPodcasterAgent {
     this.ollamaModel = config.ollamaModel || "llama3.2";
     this.ollamaUrl = config.ollamaUrl || "http://localhost:11434";
 
+    this.scriptGoal = null;
+
     // Index initial guest bios
     this._indexGuestBios();
   }
@@ -144,6 +146,13 @@ export class AIPodcasterAgent {
   }
 
   /**
+   * Set the current script goal to steer the conversation.
+   */
+  setScriptGoal(goal) {
+    this.scriptGoal = goal;
+  }
+
+  /**
    * Upload a knowledge document, optionally tagged to a specific guest.
    */
   uploadKnowledgeDocument(sourceTitle, textContent, guestId = null) {
@@ -189,6 +198,13 @@ export class AIPodcasterAgent {
     const persona = this._getPersona();
     const guestContext = this._buildGuestContext();
 
+    let scriptContext = "";
+    if (this.scriptGoal) {
+      const targetGuest = this._getGuest(this.scriptGoal.targetGuestId);
+      const targetName = targetGuest ? targetGuest.name : "the guest";
+      scriptContext = `\nSCRIPT GOAL:\nYour immediate goal in this turn is to ask ${targetName} the following question: "${this.scriptGoal.text}". Organically bridge the conversation toward this question.\n`;
+    }
+
     return `You are JOY, an intelligent AI podcast host at ${this.conferenceName}.
 Main Topic: ${this.topic}
 
@@ -196,7 +212,7 @@ ${persona.systemPromptFlavor}
 
 PANEL GUESTS:
 ${guestContext}
-
+${scriptContext}
 ${additionalContext ? `ADDITIONAL CONTEXT:\n${additionalContext}\n` : ''}
 REASONING INSTRUCTIONS:
 Before writing your verbal response, you MUST think logically inside <think>...</think> tags:
