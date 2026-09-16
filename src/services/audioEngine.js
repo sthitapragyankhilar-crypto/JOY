@@ -140,7 +140,11 @@ export class AudioEngine {
     }
 
     // Basic SSML/text cleanup if needed (Deepgram mostly just takes plain text)
-    const cleanText = text.replace(/[\*\_]/g, '').trim();
+    const cleanText = text
+      .replace(/[\*\_]/g, '')
+      .replace(/\bDr\./gi, 'Doctor')
+      .replace(/\bP\.?h\.?d\.?/gi, 'PhD')
+      .trim();
     if (!cleanText) {
        console.warn("TTS: No text to speak after cleaning.");
        if (onEnd) onEnd();
