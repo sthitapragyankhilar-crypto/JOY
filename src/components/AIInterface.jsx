@@ -356,21 +356,25 @@ export function AIInterface() {
         </div>
 
         {/* Panel Toggles (Mobile + Desktop) */}
-        <button
-          className="panel-toggle panel-toggle--left"
-          onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-          aria-label="Toggle Conversation"
-        >
-          <MessageSquare size={18} />
-        </button>
+        {!leftPanelOpen && (
+          <button
+            className="panel-toggle panel-toggle--left"
+            onClick={() => setLeftPanelOpen(true)}
+            aria-label="Toggle Conversation"
+          >
+            <MessageSquare size={18} />
+          </button>
+        )}
 
-        <button
-          className="panel-toggle panel-toggle--right"
-          onClick={() => setRightPanelOpen(!rightPanelOpen)}
-          aria-label="Toggle Memory"
-        >
-          <Brain size={18} />
-        </button>
+        {!rightPanelOpen && (
+          <button
+            className="panel-toggle panel-toggle--right"
+            onClick={() => setRightPanelOpen(true)}
+            aria-label="Toggle Memory"
+          >
+            <Brain size={18} />
+          </button>
+        )}
 
         {/* Floating Panels */}
         <ConversationPanel
