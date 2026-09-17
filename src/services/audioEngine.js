@@ -178,6 +178,7 @@ export class AudioEngine {
       this.ttsSource = this.audioContext.createBufferSource();
       this.ttsSource.buffer = audioBuffer;
       this.ttsSource.connect(this.audioContext.destination);
+      this.ttsSource.connect(this.analyser);
       
       this.ttsSource.onended = () => {
         this.isSpeaking = false;
