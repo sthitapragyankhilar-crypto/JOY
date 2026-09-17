@@ -73,7 +73,7 @@ export class AudioEngine {
       
       this.socket.onopen = () => {
         this.mediaRecorder.addEventListener('dataavailable', event => {
-          if (event.data.size > 0 && this.socket.readyState === 1) {
+          if (event.data.size > 0 && this.socket && this.socket.readyState === 1) {
             this.socket.send(event.data);
           }
         });
@@ -130,20 +130,21 @@ export class AudioEngine {
    * @param {object} options - { pitch, rate, onStart, onEnd, onError }
    */
   async speakText(text, { pitch = 1.0, rate = 1.0, ttsVoice = 'aura-asteria-en', onStart, onEnd, onError } = {}) {
-    if (!this.deepgramApiKey) {
-      if (onError) onError("Deepgram API Key is missing. TTS disabled.");
+    console.log(`[AUDIO DEBUG] speakText called. isSpeaking=${this.isSpeaking}, hasTtsSource=${!!this.ttsSource}`);
+    if (!this.deepgramApiKey && ttsVoice.startsWith('aura-')) {
+      if (onError) onError("Deepgram API Key is missing. Deepgram TTS disabled.");
       return;
     }
 
-    if (this.isSpeaking) {
-       this.stopSpeaking();
-    }
+    // Force stop ANY previous audio
+    this.stopSpeaking();
 
     // Basic SSML/text cleanup if needed (Deepgram mostly just takes plain text)
     const cleanText = text
       .replace(/[\*\_]/g, '')
       .replace(/\bDr\./gi, 'Doctor')
       .replace(/\bP\.?h\.?d\.?/gi, 'PhD')
+      .replace(/\bJOY\b/g, 'Joy')
       .trim();
     if (!cleanText) {
        console.warn("TTS: No text to speak after cleaning.");
@@ -151,23 +152,43 @@ export class AudioEngine {
        return;
     }
 
-    console.log(`TTS: Requesting Deepgram Aura (${ttsVoice}) for:`, cleanText.substring(0, 50) + "...");
-
     try {
       this.isSpeaking = true;
       if (onStart) onStart();
 
-      const response = await fetch(`https://api.deepgram.com/v1/speak?model=${ttsVoice}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Token ${this.deepgramApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ text: cleanText })
-      });
+      let response;
+      if (ttsVoice.startsWith('aura-')) {
+        console.log(`TTS: Requesting Deepgram Aura (${ttsVoice}) for:`, cleanText.substring(0, 50) + "...");
+        response = await fetch(`https://api.deepgram.com/v1/speak?model=${ttsVoice}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${this.deepgramApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: cleanText })
+        });
+      } else {
+        console.log(`TTS: Requesting Edge-TTS (${ttsVoice}) for:`, cleanText.substring(0, 50) + "...");
+        const formData = new FormData();
+        formData.append("text", cleanText);
+        formData.append("voice", ttsVoice);
+        
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+        response = await fetch(`${backendUrl}/api/tts`, {
+          method: "POST",
+          body: formData
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Deepgram TTS failed: ${response.statusText}`);
+      }
+
+      // Check if we were stopped while waiting for the fetch
+      if (!this.isSpeaking) {
+        console.log('[AUDIO DEBUG] Was stopped during fetch, aborting playback');
+        if (onEnd) onEnd();
+        return;
       }
 
       const arrayBuffer = await response.arrayBuffer();
@@ -175,16 +196,25 @@ export class AudioEngine {
       this._ensureAudioContext();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       
+      // Double check we weren't stopped while decoding
+      if (!this.isSpeaking) {
+        console.log('[AUDIO DEBUG] Was stopped during decode, aborting playback');
+        if (onEnd) onEnd();
+        return;
+      }
+
       this.ttsSource = this.audioContext.createBufferSource();
       this.ttsSource.buffer = audioBuffer;
       this.ttsSource.connect(this.audioContext.destination);
       this.ttsSource.connect(this.analyser);
       
       this.ttsSource.onended = () => {
+        console.log('[AUDIO DEBUG] ttsSource.onended fired');
         this.isSpeaking = false;
         if (onEnd) onEnd();
       };
 
+      console.log('[AUDIO DEBUG] Starting audio playback NOW');
       this.ttsSource.start(0);
 
     } catch (err) {

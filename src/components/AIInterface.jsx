@@ -66,7 +66,7 @@ export function AIInterface() {
     deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434',
-    ttsVoice: 'aura-asteria-en'
+    ttsVoice: 'en-US-AvaNeural'
   });
 
   const activeGuest = guests.find(g => g.id === activeGuestId) || guests[0];
@@ -164,11 +164,13 @@ export function AIInterface() {
   };
 
   const handleStartInterview = async () => {
+    console.log('[DEBUG] handleStartInterview CALLED at', Date.now());
     isContinuousModeRef.current = true;
     setStageStatus('thinking');
 
     try {
       const response = await agentRef.current.generateOpening();
+      console.log('[DEBUG] generateOpening RETURNED:', response.spokenResponse?.substring(0, 60));
 
       setTranscript([{
         sender: 'host',
@@ -178,10 +180,11 @@ export function AIInterface() {
       }]);
 
       setStageStatus('speaking_host');
+      console.log('[DEBUG] speakText CALLED for opening at', Date.now());
       audioRef.current.speakText(response.spokenResponse, {
         pitch: HOST_PERSONAS[hostPersonaIdRef.current]?.pitch || 1.0,
         rate: HOST_PERSONAS[hostPersonaIdRef.current]?.rate || 1.0,
-        ttsVoice: configRef.current?.ttsVoice || 'aura-asteria-en',
+        ttsVoice: configRef.current?.ttsVoice || 'en-US-AvaNeural',
         onStart: () => audioRef.current.startMicVisualizer(), // reuse mic for output viz if needed
         onEnd: () => {
           if (isContinuousModeRef.current) {
@@ -259,6 +262,7 @@ export function AIInterface() {
   };
 
   const processGuestAnswer = async (answerText) => {
+    console.log('[DEBUG] processGuestAnswer CALLED at', Date.now(), 'text:', answerText?.substring(0, 40));
     if (!answerText.trim()) return;
 
     setTranscript(prev => [...prev, {
@@ -301,10 +305,11 @@ export function AIInterface() {
       }]);
 
       setStageStatus('speaking_host');
+      console.log('[DEBUG] speakText CALLED for response at', Date.now(), 'text:', response.spokenResponse?.substring(0, 60));
       audioRef.current.speakText(response.spokenResponse, {
         pitch: HOST_PERSONAS[hostPersonaIdRef.current]?.pitch || 1.0,
         rate: HOST_PERSONAS[hostPersonaIdRef.current]?.rate || 1.0,
-        ttsVoice: configRef.current?.ttsVoice || 'aura-asteria-en',
+        ttsVoice: configRef.current?.ttsVoice || 'en-US-AvaNeural',
         onEnd: () => {
           if (isContinuousModeRef.current) {
             handleStartListening();

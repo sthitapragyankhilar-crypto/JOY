@@ -435,9 +435,13 @@ export function SettingsModal({
               <label className="form-label">JOY's Voice (Deepgram Aura)</label>
               <select
                 className="form-input"
-                value={localConfig.ttsVoice || 'aura-asteria-en'}
+                value={localConfig.ttsVoice || 'en-US-AvaNeural'}
                 onChange={e => updateLocalConfig('ttsVoice', e.target.value)}
               >
+                <optgroup label="Edge-TTS (High Quality)">
+                  <option value="en-US-AvaNeural" style={{ color: 'black' }}>Ava (Neural)</option>
+                  <option value="en-US-AndrewNeural" style={{ color: 'black' }}>Andrew (Neural)</option>
+                </optgroup>
                 <optgroup label="Female Voices">
                   <option value="aura-asteria-en" style={{ color: 'black' }}>Asteria (Natural, Professional)</option>
                   <option value="aura-luna-en" style={{ color: 'black' }}>Luna (Soft, Friendly)</option>
