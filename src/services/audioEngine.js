@@ -44,6 +44,7 @@ export class AudioEngine {
       return;
     }
     
+    this.stopListening();
     this.isListening = true;
 
     try {
@@ -61,7 +62,7 @@ export class AudioEngine {
 
       this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
       
-      let url = 'wss://api.deepgram.com/v1/listen?diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
+      let url = 'wss://api.deepgram.com/v1/listen?model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
       if (keywords && keywords.length > 0) {
         // Unique keywords
         const uniqueKeywords = [...new Set(keywords)];
@@ -72,12 +73,14 @@ export class AudioEngine {
       this.socket = new WebSocket(url, ['token', this.deepgramApiKey]);
       
       this.socket.onopen = () => {
-        this.mediaRecorder.addEventListener('dataavailable', event => {
-          if (event.data.size > 0 && this.socket && this.socket.readyState === 1) {
-            this.socket.send(event.data);
-          }
-        });
-        this.mediaRecorder.start(250);
+        if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+          this.mediaRecorder.addEventListener('dataavailable', event => {
+            if (event.data.size > 0 && this.socket && this.socket.readyState === 1) {
+              this.socket.send(event.data);
+            }
+          });
+          this.mediaRecorder.start(250);
+        }
       };
 
       this.socket.onmessage = (message) => {
@@ -187,7 +190,6 @@ export class AudioEngine {
       // Check if we were stopped while waiting for the fetch
       if (!this.isSpeaking) {
         console.log('[AUDIO DEBUG] Was stopped during fetch, aborting playback');
-        if (onEnd) onEnd();
         return;
       }
 
@@ -199,7 +201,6 @@ export class AudioEngine {
       // Double check we weren't stopped while decoding
       if (!this.isSpeaking) {
         console.log('[AUDIO DEBUG] Was stopped during decode, aborting playback');
-        if (onEnd) onEnd();
         return;
       }
 
@@ -227,6 +228,7 @@ export class AudioEngine {
 
   stopSpeaking() {
     if (this.ttsSource) {
+      this.ttsSource.onended = null;
       try { this.ttsSource.stop(); } catch(e) {}
       this.ttsSource = null;
     }
