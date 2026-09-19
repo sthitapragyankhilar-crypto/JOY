@@ -10,7 +10,7 @@
 
 import { HOST_PERSONAS } from '../components/PersonaBadge';
 
-export class RAGKnowledgeBase {
+class RAGKnowledgeBase {
   constructor() {
     this.chunks = [];
   }
