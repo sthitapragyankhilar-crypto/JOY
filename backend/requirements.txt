@@ -7,3 +7,4 @@ python-multipart
 groq
 httpx
 websockets
+python-dotenv

@@ -7,6 +7,11 @@ Stack:
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
+
 import re
 import tempfile
 import traceback
@@ -171,11 +176,15 @@ async def stt_websocket(websocket: WebSocket):
             
             async def forward_to_deepgram():
                 try:
+                    count = 0
                     while True:
                         data = await websocket.receive_bytes()
+                        count += 1
+                        if count % 20 == 0:
+                            print(f"Forwarded {count} chunks to Deepgram")
                         await dg_ws.send(data)
                 except WebSocketDisconnect:
-                    pass
+                    print("Client disconnected")
                 except Exception as e:
                     print(f"Error forwarding to Deepgram: {e}")
                 finally:
@@ -186,8 +195,10 @@ async def stt_websocket(websocket: WebSocket):
                     while True:
                         message = await dg_ws.recv()
                         await websocket.send_text(message)
+                        if '"is_final":true' in message or '"type":"Results"' in message:
+                            print("Received Result from Deepgram")
                 except websockets.exceptions.ConnectionClosed:
-                    pass
+                    print("Deepgram closed connection")
                 except Exception as e:
                     print(f"Error forwarding to client: {e}")
                 finally:
