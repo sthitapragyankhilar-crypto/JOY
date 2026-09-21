@@ -327,7 +327,7 @@ Generate a natural, warm podcast opening. Set up the topic, welcome the guests, 
     ]);
 
     if (response.renameSpeaker) {
-        this.history[this.history.length - 1].guestName = response.renameSpeaker.name;
+      this.history[this.history.length - 1].guestName = response.renameSpeaker.name;
     }
 
     this.history.push({ role: "host", content: response.spokenResponse });
