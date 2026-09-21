@@ -91,7 +91,7 @@ export class AIPodcasterAgent {
     this.usedTemplates = new Set();
 
     this.engine = config.engine || "groq";
-    this.groqApiKey = config.groqApiKey || import.meta.env.VITE_GROQ_API_KEY || "";
+    this.groqApiKey = config.groqApiKey || "";
     this.ollamaModel = config.ollamaModel || "llama3.2";
     this.ollamaUrl = config.ollamaUrl || "http://localhost:11434";
 

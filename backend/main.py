@@ -1,12 +1,12 @@
 """
 Backend for JOY - RAG-Powered AI Podcaster Voice Agent
 Stack:
- - RAG Indexer: In-Memory Vector / TF-IDF Semantic Search over uploaded Guest Documents
  - Speech-to-Text: Faster-Whisper (Run locally on CPU/GPU)
  - Reasoning & LLM: Ollama (Llama 3.2 / DeepSeek R1)
  - Text-to-Speech: Edge-TTS (Microsoft Neural Voice - hyper-realistic & free)
 """
 
+import os
 import re
 import tempfile
 import traceback
@@ -18,23 +18,19 @@ from pydantic import BaseModel
 import edge_tts
 from groq import Groq
 
-app = FastAPI(title="JOY - RAG AI Podcaster Agent Backend")
+app = FastAPI(title="JOY - AI Podcaster Agent Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://joy-khaki.vercel.app"
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# RAG Knowledge Storage
-class DocumentChunk(BaseModel):
-    id: str
-    title: str
-    text: str
-
-knowledge_base: List[DocumentChunk] = []
 
 JOY_SYSTEM_PROMPT = """You are JOY, a sharp, warm, and naturally curious AI podcast host at a live technology conference.
 You are interviewing a guest on stage. Your job is to have a genuine, flowing conversation — not an interrogation.
@@ -68,49 +64,16 @@ FORMAT:
 </think>
 [JOY's spoken response — this is what the audience hears]"""
 
-class KnowledgeUploadRequest(BaseModel):
-    title: str
-    content: str
-
 @app.get("/")
 def read_root():
     return {
         "status": "online",
-        "bot_name": "JOY",
-        "rag_chunks_indexed": len(knowledge_base)
+        "bot_name": "JOY"
     }
-
-@app.post("/api/upload-knowledge")
-async def upload_knowledge(req: KnowledgeUploadRequest):
-    """Uploads and chunks guest documents into RAG Knowledge Base."""
-    paragraphs = [p.strip() for p in req.content.split("\n\n") if len(p.strip()) > 15]
-    for idx, p in enumerate(paragraphs):
-        chunk_id = f"{req.title}_{idx}"
-        knowledge_base.append(DocumentChunk(id=chunk_id, title=req.title, text=p))
-    
-    return {"status": "success", "chunks_added": len(paragraphs), "total_knowledge_base_chunks": len(knowledge_base)}
-
-def search_rag(query: str, top_k: int = 2) -> List[DocumentChunk]:
-    if not knowledge_base or not query:
-        return []
-    
-    tokens = re.findall(r"\w+", query.lower())
-    tokens = [t for t in tokens if len(t) > 2]
-    if not tokens:
-        return []
-
-    scored = []
-    for chunk in knowledge_base:
-        score = sum(1 for t in tokens if t in chunk.text.lower())
-        if score > 0:
-            scored.append((score, chunk))
-    
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [item[1] for item in scored[:top_k]]
 
 class ProxyChatRequest(BaseModel):
     messages: list
-    api_key: str
+    api_key: str = ""
     model: str = "openai/gpt-oss-120b"
     temperature: float = 0.75
     max_tokens: int = 800
@@ -118,10 +81,12 @@ class ProxyChatRequest(BaseModel):
 @app.post("/api/proxy-chat")
 async def proxy_chat(req: ProxyChatRequest):
     """Proxies chat requests to Groq to bypass browser CORS limitations."""
-    if not req.api_key:
-        raise HTTPException(status_code=400, detail="Groq API key is required. Set it in Settings > Engine & Voice.")
+    # Use provided API key or fallback to environment variable
+    final_api_key = req.api_key if req.api_key else os.environ.get("GROQ_API_KEY")
+    if not final_api_key:
+        raise HTTPException(status_code=400, detail="Groq API key is missing. Set it in Settings or backend environment variables.")
     try:
-        client = Groq(api_key=req.api_key)
+        client = Groq(api_key=final_api_key)
 
         response = client.chat.completions.create(
             model=req.model,
@@ -137,6 +102,9 @@ async def proxy_chat(req: ProxyChatRequest):
 @app.post("/api/tts")
 async def synthesize_speech(text: str = Form(...), voice: str = Form("en-US-AvaNeural")):
     """Generates hyper-realistic neural audio for JOY using Edge-TTS."""
+    if len(text) > 5000:
+        raise HTTPException(status_code=413, detail="Payload too large. Text must be under 5000 characters.")
+        
     try:
         clean_text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
         
