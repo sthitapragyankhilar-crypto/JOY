@@ -10,10 +10,13 @@ import os
 import re
 import tempfile
 import traceback
+import asyncio
+import httpx
+import websockets
 from typing import List
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 import edge_tts
 from groq import Groq
@@ -119,6 +122,89 @@ async def synthesize_speech(text: str = Form(...), voice: str = Form("en-US-AvaN
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"TTS synthesis error: {str(e)}") from e
+
+@app.post("/api/deepgram-tts")
+async def deepgram_tts(req: Request):
+    """Proxies Deepgram TTS requests to hide the API key."""
+    api_key = os.environ.get("DEEPGRAM_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="DEEPGRAM_API_KEY not configured on server")
+    
+    body = await req.json()
+    voice = req.query_params.get("model", "aura-asteria-en")
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(
+                f"https://api.deepgram.com/v1/speak?model={voice}",
+                headers={
+                    "Authorization": f"Token {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=body
+            )
+            res.raise_for_status()
+            return Response(content=res.content, media_type="audio/mpeg")
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/api/stt")
+async def stt_websocket(websocket: WebSocket):
+    """Proxies STT websocket to Deepgram."""
+    await websocket.accept()
+    api_key = os.environ.get("DEEPGRAM_API_KEY")
+    if not api_key:
+        await websocket.close(code=1011, reason="DEEPGRAM_API_KEY not configured")
+        return
+
+    # Extract query params from incoming request
+    query_string = websocket.url.query
+    deepgram_url = f"wss://api.deepgram.com/v1/listen?{query_string}"
+
+    try:
+        async with websockets.connect(
+            deepgram_url, 
+            additional_headers={"Authorization": f"Token {api_key}"}
+        ) as dg_ws:
+            
+            async def forward_to_deepgram():
+                try:
+                    while True:
+                        data = await websocket.receive_bytes()
+                        await dg_ws.send(data)
+                except WebSocketDisconnect:
+                    pass
+                except Exception as e:
+                    print(f"Error forwarding to Deepgram: {e}")
+                finally:
+                    await dg_ws.close()
+
+            async def forward_to_client():
+                try:
+                    while True:
+                        message = await dg_ws.recv()
+                        await websocket.send_text(message)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+                except Exception as e:
+                    print(f"Error forwarding to client: {e}")
+                finally:
+                    await websocket.close()
+
+            # Run both forwarding tasks concurrently
+            await asyncio.gather(
+                forward_to_deepgram(),
+                forward_to_client()
+            )
+
+    except Exception as e:
+        print(f"Failed to connect to Deepgram: {e}")
+        try:
+            await websocket.close(code=1011, reason="Failed to connect to STT provider")
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn

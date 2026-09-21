@@ -5,3 +5,5 @@ ollama
 pydantic
 python-multipart
 groq
+httpx
+websockets

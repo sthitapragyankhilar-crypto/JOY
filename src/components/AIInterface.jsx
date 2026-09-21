@@ -62,8 +62,6 @@ export function AIInterface() {
     conferenceName: 'Tech AI Summit 2026',
     topic: 'Scalable Autonomous Reasoning Agents',
     engine: 'groq',
-    groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
-    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434',
     ttsVoice: 'en-US-AvaNeural'
@@ -86,7 +84,7 @@ export function AIInterface() {
       guests,
       hostPersonaId
     });
-    audioRef.current = new AudioEngine(config.deepgramApiKey);
+    audioRef.current = new AudioEngine();
 
     // Setup audio level polling for the sphere
     audioContextPollerRef.current = setInterval(() => {

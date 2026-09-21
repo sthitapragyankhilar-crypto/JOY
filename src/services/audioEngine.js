@@ -4,8 +4,7 @@
  */
 
 export class AudioEngine {
-  constructor(deepgramApiKey = '') {
-    this.deepgramApiKey = deepgramApiKey;
+  constructor() {
     this.audioContext = null;
     this.analyser = null;
     this.mediaStream = null;
@@ -39,10 +38,6 @@ export class AudioEngine {
   }
 
   async startListening({ onSpeakerTranscript, onSilenceDetected, onError, onEnd, keywords = [] }) {
-    if (!this.deepgramApiKey) {
-      if (onError) onError("Deepgram API Key is missing. Please add it in settings.");
-      return;
-    }
     
     this.stopListening();
     this.isListening = true;
@@ -62,7 +57,8 @@ export class AudioEngine {
 
       this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
       
-      let url = 'wss://api.deepgram.com/v1/listen?model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500';
+      const backendWsUrl = import.meta.env.VITE_BACKEND_WS_URL || "ws://localhost:8000";
+      let url = `${backendWsUrl}/api/stt?model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500`;
       if (keywords && keywords.length > 0) {
         // Unique keywords
         const uniqueKeywords = [...new Set(keywords)];
@@ -70,7 +66,7 @@ export class AudioEngine {
           url += `&keywords=${encodeURIComponent(kw)}:10`;
         });
       }
-      this.socket = new WebSocket(url, ['token', this.deepgramApiKey]);
+      this.socket = new WebSocket(url);
       
       this.socket.onopen = () => {
         if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
@@ -134,10 +130,6 @@ export class AudioEngine {
    */
   async speakText(text, { pitch = 1.0, rate = 1.0, ttsVoice = 'aura-asteria-en', onStart, onEnd, onError } = {}) {
     console.log(`[AUDIO DEBUG] speakText called. isSpeaking=${this.isSpeaking}, hasTtsSource=${!!this.ttsSource}`);
-    if (!this.deepgramApiKey && ttsVoice.startsWith('aura-')) {
-      if (onError) onError("Deepgram API Key is missing. Deepgram TTS disabled.");
-      return;
-    }
 
     // Force stop ANY previous audio
     this.stopSpeaking();
@@ -159,13 +151,13 @@ export class AudioEngine {
       this.isSpeaking = true;
       if (onStart) onStart();
 
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
       let response;
       if (ttsVoice.startsWith('aura-')) {
         console.log(`TTS: Requesting Deepgram Aura (${ttsVoice}) for:`, cleanText.substring(0, 50) + "...");
-        response = await fetch(`https://api.deepgram.com/v1/speak?model=${ttsVoice}`, {
+        response = await fetch(`${backendUrl}/api/deepgram-tts?model=${ttsVoice}`, {
           method: "POST",
           headers: {
-            "Authorization": `Token ${this.deepgramApiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ text: cleanText })
@@ -176,7 +168,6 @@ export class AudioEngine {
         formData.append("text", cleanText);
         formData.append("voice", ttsVoice);
         
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
         response = await fetch(`${backendUrl}/api/tts`, {
           method: "POST",
           body: formData

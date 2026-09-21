@@ -459,34 +459,14 @@ export function SettingsModal({
               </select>
             </div>
 
-            {/* Groq API Key */}
-            <div className="form-group animate-fade-in">
-              <label className="form-label">Groq API Key</label>
-              <input
-                className="form-input"
-                type="password"
-                value={localConfig.groqApiKey}
-                onChange={e => updateLocalConfig('groqApiKey', e.target.value)}
-                placeholder="gsk_your_groq_api_key_here"
-              />
-              <p className="form-hint">
-                Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>console.groq.com</a>
-              </p>
-            </div>
-
-            {/* Deepgram API Key */}
+            {/* Server-managed API Keys Note */}
             <div className="form-group animate-fade-in" style={{ marginTop: '16px' }}>
-              <label className="form-label">Deepgram API Key (Voice Recognition)</label>
-              <input
-                className="form-input"
-                type="password"
-                value={localConfig.deepgramApiKey}
-                onChange={e => updateLocalConfig('deepgramApiKey', e.target.value)}
-                placeholder="your_deepgram_api_key_here"
-              />
-              <p className="form-hint">
-                Required for real-time acoustic speaker separation. Get a key at <a href="https://console.deepgram.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>console.deepgram.com</a>
-              </p>
+              <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="var(--accent)" />
+                  API Keys are securely managed on the backend.
+                </p>
+              </div>
             </div>
           </div>
         )}

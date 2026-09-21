@@ -91,7 +91,6 @@ export class AIPodcasterAgent {
     this.usedTemplates = new Set();
 
     this.engine = config.engine || "groq";
-    this.groqApiKey = config.groqApiKey || "";
     this.ollamaModel = config.ollamaModel || "llama3.2";
     this.ollamaUrl = config.ollamaUrl || "http://localhost:11434";
 
@@ -112,9 +111,8 @@ export class AIPodcasterAgent {
     });
   }
 
-  setEngineConfig({ engine, groqApiKey, ollamaModel, ollamaUrl, topic, conferenceName }) {
+  setEngineConfig({ engine, ollamaModel, ollamaUrl, topic, conferenceName }) {
     if (engine) this.engine = engine;
-    if (groqApiKey !== undefined) this.groqApiKey = groqApiKey;
     if (ollamaModel) this.ollamaModel = ollamaModel;
     if (ollamaUrl) this.ollamaUrl = ollamaUrl;
     if (topic) this.topic = topic;
@@ -339,7 +337,7 @@ Generate a natural, warm podcast opening. Set up the topic, welcome the guests, 
   }
 
   async _processLLMRequest(messages) {
-    if (this.engine === "groq" && this.groqApiKey) {
+    if (this.engine === "groq") {
       return await this._callGroqAPI(messages);
     } else if (this.engine === "ollama") {
       return await this._callOllamaAPI(messages);
@@ -355,7 +353,7 @@ Generate a natural, warm podcast opening. Set up the topic, welcome the guests, 
     const res = await fetch(`${backendUrl}/api/proxy-chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: this.groqApiKey, model: "openai/gpt-oss-120b", messages, temperature: 0.75, max_tokens: 800 })
+      body: JSON.stringify({ model: "openai/gpt-oss-120b", messages, temperature: 0.75, max_tokens: 800 })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
