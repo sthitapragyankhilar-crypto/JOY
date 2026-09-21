@@ -62,7 +62,7 @@ export function AIInterface() {
     conferenceName: 'Tech AI Summit 2026',
     topic: 'Scalable Autonomous Reasoning Agents',
     engine: 'groq',
-    groqApiKey: '',
+    groqApiKey: import.meta.env.VITE_GROQ_API_KEY || '',
     deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || '',
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434',
