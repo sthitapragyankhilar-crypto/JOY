@@ -9,8 +9,11 @@ Stack:
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env
-load_dotenv()
+# Load environment variables from .env, checking both current and parent directory
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if not os.path.exists(env_path):
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+load_dotenv(env_path)
 
 import re
 import tempfile
