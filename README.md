@@ -74,27 +74,33 @@ The agent features **Retrieval-Augmented Generation (RAG)** for factual groundin
 
 ## 🚀 Quick Start Guide
 
-### Web Podcast Studio (Frontend)
+### 1. Environment Setup
+Create a `.env` file in the root directory to store your API keys:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+```
+*(Note: Your Python backend will automatically detect the `.env` file in the root folder).*
 
-1. **Environment Setup**:
-   Create a `.env` file in the root directory to store your API keys:
-   ```env
-   VITE_GROQ_API_KEY=your_groq_api_key_here
-   VITE_DEEPGRAM_API_KEY=your_deepgram_api_key_here
-   ```
+### 2. Python Backend (FastAPI)
+The backend handles the Deepgram STT/TTS proxying to protect your API keys.
+Open a terminal in the project root:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+pip install -r requirements.txt
+python main.py
+```
+The backend will run on `http://localhost:8000`.
 
-2. **Install Dependencies**:
-   Open a terminal in the project root:
-   ```bash
-   npm install
-   ```
-
-3. **Launch Studio UI**:
-   ```bash
-   npm run dev
-   ```
-4. Open `http://localhost:3000` (or the port specified by Vite) in your browser.
-5. Open the settings panel (gear icon) to configure your models, set up your guest bios, and adjust the host persona!
+### 3. Web Podcast Studio (Frontend)
+Open a **new** terminal in the project root:
+```bash
+npm install
+npm run dev
+```
+Open `http://localhost:3000` (or the port specified by Vite) in your browser. Open the settings panel (gear icon) to configure your models and adjust the host persona!
 
 ---
 
