@@ -55,7 +55,13 @@ export class AudioEngine {
         // Ignored if already connected
       }
 
-      this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
+      let options = {};
+      if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/webm' };
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options = { mimeType: 'audio/mp4' };
+      }
+      this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
       
       const backendWsUrl = import.meta.env.VITE_BACKEND_WS_URL || "ws://localhost:8000";
       let url = `${backendWsUrl}/api/stt?model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500`;
