@@ -179,39 +179,35 @@ async def stt_websocket(websocket: WebSocket):
             
             async def forward_to_deepgram():
                 try:
-                    count = 0
                     while True:
-                        data = await websocket.receive_bytes()
-                        count += 1
-                        if count % 20 == 0:
-                            print(f"Forwarded {count} chunks to Deepgram")
-                        await dg_ws.send(data)
-                except WebSocketDisconnect:
-                    print("Client disconnected")
+                        message = await websocket.receive()
+                        if "bytes" in message and message["bytes"]:
+                            await dg_ws.send(message["bytes"])
+                        elif "text" in message and message["text"]:
+                            await dg_ws.send(message["text"])
+                        elif message["type"] == "websocket.disconnect":
+                            break
                 except Exception as e:
-                    print(f"Error forwarding to Deepgram: {e}")
-                finally:
-                    await dg_ws.close()
+                    pass
 
             async def forward_to_client():
                 try:
                     while True:
                         message = await dg_ws.recv()
-                        await websocket.send_text(message)
-                        if '"is_final":true' in message or '"type":"Results"' in message:
-                            print("Received Result from Deepgram")
-                except websockets.exceptions.ConnectionClosed:
-                    print("Deepgram closed connection")
+                        if isinstance(message, bytes):
+                            await websocket.send_bytes(message)
+                        else:
+                            await websocket.send_text(message)
                 except Exception as e:
-                    print(f"Error forwarding to client: {e}")
-                finally:
-                    await websocket.close()
+                    pass
 
-            # Run both forwarding tasks concurrently
-            await asyncio.gather(
-                forward_to_deepgram(),
-                forward_to_client()
-            )
+            # Run both forwarding tasks concurrently and clean up when one exits
+            t1 = asyncio.create_task(forward_to_deepgram())
+            t2 = asyncio.create_task(forward_to_client())
+            
+            done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
 
     except Exception as e:
         print(f"Failed to connect to Deepgram: {e}")
