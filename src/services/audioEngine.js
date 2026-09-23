@@ -63,16 +63,26 @@ export class AudioEngine {
       }
       this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
       
-      const backendWsUrl = import.meta.env.VITE_BACKEND_WS_URL || "ws://localhost:8000";
-      let url = `${backendWsUrl}/api/stt?model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500`;
+      let url;
+      let protocols = [];
+      const sttParams = "model=nova-2&diarize=true&punctuate=true&interim_results=true&utterance_end_ms=2500";
+      
+      if (import.meta.env.VITE_DEEPGRAM_API_KEY) {
+        url = `wss://api.deepgram.com/v1/listen?${sttParams}`;
+        protocols = ["token", import.meta.env.VITE_DEEPGRAM_API_KEY];
+      } else {
+        const backendWsUrl = import.meta.env.VITE_BACKEND_WS_URL || "ws://localhost:8000";
+        url = `${backendWsUrl}/api/stt?${sttParams}`;
+      }
+
       if (keywords && keywords.length > 0) {
-        // Unique keywords
         const uniqueKeywords = [...new Set(keywords)];
         uniqueKeywords.forEach(kw => {
           url += `&keywords=${encodeURIComponent(kw)}:10`;
         });
       }
-      this.socket = new WebSocket(url);
+      
+      this.socket = new WebSocket(url, protocols.length > 0 ? protocols : undefined);
       
       this.socket.onopen = () => {
         if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
