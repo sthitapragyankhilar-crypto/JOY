@@ -188,7 +188,7 @@ async def stt_websocket(websocket: WebSocket):
                         elif message["type"] == "websocket.disconnect":
                             break
                 except Exception as e:
-                    pass
+                    print(f"DEBUG: forward_to_deepgram error: {e}")
 
             async def forward_to_client():
                 try:
@@ -199,20 +199,25 @@ async def stt_websocket(websocket: WebSocket):
                         else:
                             await websocket.send_text(message)
                 except Exception as e:
-                    pass
+                    print(f"DEBUG: forward_to_client error: {e}")
 
-            # Run both forwarding tasks concurrently and clean up when one exits
             t1 = asyncio.create_task(forward_to_deepgram())
             t2 = asyncio.create_task(forward_to_client())
             
             done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
-
+                
     except Exception as e:
-        print(f"Failed to connect to Deepgram: {e}")
+        error_msg = f"Failed to connect or proxy Deepgram: {str(e)}"
+        print(error_msg)
         try:
-            await websocket.close(code=1011, reason="Failed to connect to STT provider")
+            await websocket.send_text(f'{{"type": "Error", "message": "{error_msg}"}}')
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
         except:
             pass
 
